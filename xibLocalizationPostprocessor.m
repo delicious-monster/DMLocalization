@@ -50,7 +50,7 @@ int main(int argc, const char *argv[])
                     }
                     NSString *stringNeedingLocalization = [line substringFromIndex:NSMaxRange(quoteEqualsQuoteRange)]; // chop off leading: "blah" = "
                     stringNeedingLocalization = [stringNeedingLocalization substringToIndex:stringNeedingLocalization.length - 2]; // chop off trailing: ";
-                    [outputStrings appendFormat:@"\"%@\" = \"%@\"\;n\n", stringNeedingLocalization, stringNeedingLocalization];
+                    [outputStrings appendFormat:@"\"%@\" = \"%@\";\n\n", stringNeedingLocalization, stringNeedingLocalization];
                     continue;
                 }
             }
