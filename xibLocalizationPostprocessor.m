@@ -1,13 +1,10 @@
-//
 //  xibLocalizationPostprocessor.m
 //  Library
 //
 //  Created by William Shipley on 4/14/08.
 //  Copyright 2008 Delicious Monster Software. All rights reserved.
-//
 
 #import <Cocoa/Cocoa.h>
-
 
 
 int main(int argc, const char *argv[])
