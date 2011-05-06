@@ -9,7 +9,7 @@
 
 int main(int argc, const char *argv[])
 {
-    NSAutoreleasePool *autoreleasePool = [[NSAutoreleasePool alloc] init]; {
+    @autoreleasepool {
         if (argc != 3) {
             fprintf(stderr, "Usage: %s inputfile outputfile\n", argv[0]);
             exit (-1);   
@@ -59,5 +59,5 @@ int main(int argc, const char *argv[])
             fprintf(stderr, "Error writing %s: %s\n", argv[2], error.localizedDescription.UTF8String);
             exit (-1);
         }
-    } [autoreleasePool release];
+    }
 }
