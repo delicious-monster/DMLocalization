@@ -18,7 +18,7 @@ int main(int argc, const char *argv[])
         NSError *error = nil;
         NSStringEncoding usedEncoding;
         NSString *rawXIBStrings = [NSString stringWithContentsOfFile:[NSString stringWithUTF8String:argv[1]] usedEncoding:&usedEncoding error:&error];
-        if (error) {
+        if (!rawXIBStrings) {
             fprintf(stderr, "Error reading %s: %s\n", argv[1], error.localizedDescription.UTF8String);
             exit (-1);
         }
