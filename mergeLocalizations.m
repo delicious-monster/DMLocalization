@@ -375,9 +375,7 @@ typedef enum {
 @property (readonly, copy) NSString *specifierString; // Starts with %
 @end
 
-@implementation DMFormatString {
-    NSString *_rawString;
-}
+@implementation DMFormatString
 
 @synthesize usesExplicitFormatSpecifierPositions = _usesExplicitFormatSpecifierPositions;
 @synthesize components = _components; // Array of NSString and DMFormatSpecifier objects interleaved
@@ -388,7 +386,6 @@ typedef enum {
     NSParameterAssert(string);
     if (!(self = [super init]))
         return nil;
-    _rawString = [string copy];
     
     NSMutableArray *componentAccumulator = [NSMutableArray array];
     NSMutableString *literalAccumulator = [NSMutableString string];
