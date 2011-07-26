@@ -164,12 +164,13 @@ int main(int argc, const char *argv[])
                     }
                     
                     // Scan tokens
-                    NSString *unquotedStringToken = nil;
                     DMParseState previousParseState = parseState;
                     switch (parseState) {
                         case DMStateExpectingKey:
-                        case DMStateExpectingValue:
+                        case DMStateExpectingValue: {
                             // Read a quoted or unquoted string
+                            BOOL stringTokenNeededQuotes = YES;
+                            NSString *unquotedStringToken = nil;
                             if ([scanner scanString:@"\"" intoString:&matchString]) {
                                 NSMutableString *quotedString = [NSMutableString string];
                                 [quotedString appendString:matchString];
@@ -196,7 +197,7 @@ int main(int argc, const char *argv[])
                                     fputs([[NSString stringWithFormat:@"%@: Error: Unterminated string: %@\n", devStringsPath, [quotedString substringToIndex:MIN(quotedString.length, 10u)]] UTF8String], stderr);
                                 
                             } else if ([scanner scanUpToCharactersFromSet:[NSCharacterSet whitespaceAndNewlineCharacterSet] intoString:&matchString]) {
-                                unquotedStringToken = matchString;
+                                unquotedStringToken = matchString, stringTokenNeededQuotes = NO;
                             } else
                                 fputs([[NSString stringWithFormat:@"%@: Error: Expected to read quoted string\n", devStringsPath] UTF8String], stderr);
                             
@@ -209,7 +210,10 @@ int main(int argc, const char *argv[])
                                     fputs([[NSString stringWithFormat:@"%@: Error: Invalid key format string %@\n", devStringsPath, unquotedStringToken] UTF8String], stderr);
                                     exit(EXIT_FAILURE);
                                 }
-                                [localizedTranscription appendFormat:@"\"%@\"", unquotedStringToken];
+                                if (stringTokenNeededQuotes)
+                                    [localizedTranscription appendFormat:@"\"%@\"", unquotedStringToken];
+                                else
+                                    [localizedTranscription appendString:unquotedStringToken];
                                 parseState++;
                             } else if (parseState == DMStateExpectingValue) {
                                 NSCAssert(lastDevFormatString, nil);
@@ -222,7 +226,7 @@ int main(int argc, const char *argv[])
                                 parseState++;
                             }
                             break;
-                            
+                        }
                         case DMStateExpectingEquals:
                             if ([scanner scanString:@"=" intoString:&matchString]) {
                                 [localizedTranscription appendString:matchString];
