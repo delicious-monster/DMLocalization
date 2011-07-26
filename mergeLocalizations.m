@@ -11,7 +11,10 @@
 
 @interface DMFormatString : NSObject <NSCopying>
 - (id)initWithString:(NSString *)string;
-- (NSString *)stringByMatchingFormatString:(DMFormatString *)devFormatString;
+- (NSString *)stringByMatchingFormatString:(DMFormatString *)targetFormatString;
+@property (readonly, nonatomic) BOOL formatSpecifierPositionsAreMonotonic;
+@property (readonly, nonatomic, copy) NSArray *components;
+@property (readonly, nonatomic, copy) NSDictionary *formatSpecifiersByPosition;
 @end
 
 typedef enum {
@@ -336,6 +339,7 @@ typedef enum {
 @interface DMFormatSpecifier : NSObject
 + (NSCharacterSet *)terminatingCharacterSet;
 - (id)initWithString:(NSString *)potentialSpecifierString positionIfUnspecified:(NSInteger)fallbackPosition;
+- (NSString *)stringWithExplicitPosition;
 @property (readonly) DMFormatSpecifierType specifierType;
 @property (readonly) NSInteger position; // 1-based
 @property (readonly, copy) NSString *specifierString; // Starts with %
@@ -343,8 +347,11 @@ typedef enum {
 
 @implementation DMFormatString {
     NSString *_rawString;
-    NSArray *_components; // Array of NSString and DMFormatSpecifier objects interleaved
 }
+
+@synthesize formatSpecifierPositionsAreMonotonic = _formatSpecifierPositionsAreMonotonic;
+@synthesize components = _components; // Array of NSString and DMFormatSpecifier objects interleaved
+@synthesize formatSpecifiersByPosition = _formatSpecifiersByPosition;
 
 - (id)initWithString:(NSString *)string;
 {
@@ -359,6 +366,7 @@ typedef enum {
     NSScanner *scanner = [NSScanner scannerWithString:string];
     scanner.charactersToBeSkipped = nil;
     NSInteger specifierPosition = 1;
+    _formatSpecifierPositionsAreMonotonic = YES; // Can change in the loop
     while (![scanner isAtEnd]) {
         __autoreleasing NSString *matchString = nil;
         if ([scanner scanUpToString:@"%" intoString:&matchString]) {
@@ -405,6 +413,8 @@ typedef enum {
         }
         
         if (formatSpecifier) {
+            if (formatSpecifier.position != specifierPosition)
+                _formatSpecifierPositionsAreMonotonic = NO;
             [componentAccumulator addObject:formatSpecifier];
             specifierPosition++;
         } else
@@ -416,10 +426,34 @@ typedef enum {
     return self;
 }
 
-- (NSString *)stringByMatchingFormatString:(DMFormatString *)devFormatString;
+- (NSString *)stringByMatchingFormatString:(DMFormatString *)targetFormatString;
 {
-    // TODO:
-    return [_components componentsJoinedByString:@""];
+    NSMutableArray *matchedComponents = [NSMutableArray arrayWithCapacity:self.components.count];
+    [self.components enumerateObjectsUsingBlock:^(id obj, NSUInteger idx, BOOL *stop) {
+        if ([obj isKindOfClass:[NSString class]])
+            [matchedComponents addObject:obj];
+        else if ([obj isKindOfClass:[DMFormatSpecifier class]]) {
+            DMFormatSpecifier *targetSpecifier = [targetFormatString.formatSpecifiersByPosition objectForKey:[obj valueForKey:@"position"]];
+            DMFormatSpecifier *chosenSpecifier = obj;
+            if ([obj isEqual:targetSpecifier])
+                chosenSpecifier = targetSpecifier;
+            [matchedComponents addObject:(self.formatSpecifierPositionsAreMonotonic ? chosenSpecifier : chosenSpecifier.stringWithExplicitPosition)];
+        } else
+            NSAssert(NO, @"Bad object in components array");
+    }];
+    return [matchedComponents componentsJoinedByString:@""];
+}
+
+- (NSDictionary *)formatSpecifiersByPosition;
+{
+    if (!_formatSpecifiersByPosition) {
+        NSMutableDictionary *specifierMap = [NSMutableDictionary dictionary];
+        for (id component in self.components)
+            if ([component isKindOfClass:[DMFormatSpecifier class]])
+                [specifierMap setObject:component forKey:[component valueForKey:@"position"]];
+        _formatSpecifiersByPosition = [specifierMap copy];
+    }
+    return _formatSpecifiersByPosition;
 }
 
 - (id)copyWithZone:(NSZone *)zone;
@@ -441,7 +475,7 @@ typedef enum {
     if (![other isKindOfClass:[DMFormatString class]])
         return NO;
     DMFormatString *otherFormatString = other;
-    return [_components isEqual:otherFormatString->_components];
+    return [_components isEqual:otherFormatString.components];
 }
 
 - (NSString *)description;
@@ -450,7 +484,9 @@ typedef enum {
 @end
 
 
-@implementation DMFormatSpecifier
+@implementation DMFormatSpecifier {
+    BOOL _positionWasExplicit;
+}
 
 @synthesize specifierType = _specifierType;
 @synthesize position = _position;
@@ -503,7 +539,7 @@ typedef enum {
         _specifierString = [potentialSpecifierString copy];
         _specifierType = DMFormatSpecifierFormatStringType;
         if ([formatStringMatch rangeAtIndex:1].length > 1)
-            _position = [[potentialSpecifierString substringWithRange:[formatStringMatch rangeAtIndex:1]] integerValue];
+            _positionWasExplicit = YES, _position = [[potentialSpecifierString substringWithRange:[formatStringMatch rangeAtIndex:1]] integerValue];
         else
             _position = fallbackPosition;
         return self;
@@ -512,7 +548,7 @@ typedef enum {
     if (displayPatternMatch) {
         _specifierString = [potentialSpecifierString copy];
         _specifierType = DMFormatSpecifierDisplayPatternType;
-        _position = [[potentialSpecifierString substringWithRange:[formatStringMatch rangeAtIndex:1]] integerValue];
+        _positionWasExplicit = YES, _position = [[potentialSpecifierString substringWithRange:[formatStringMatch rangeAtIndex:1]] integerValue];
         return self;
     }
     ruleEditorMatch = [ruleEditorSpecifierRegExp firstMatchInString:potentialSpecifierString options:NSMatchingAnchored range:fullRange];
@@ -520,12 +556,20 @@ typedef enum {
         _specifierString = [potentialSpecifierString copy];
         _specifierType = DMFormatSpecifierRuleEditorType;
         if ([formatStringMatch rangeAtIndex:1].length > 1)
-            _position = [[potentialSpecifierString substringWithRange:[formatStringMatch rangeAtIndex:1]] integerValue];
+            _positionWasExplicit = YES, _position = [[potentialSpecifierString substringWithRange:[formatStringMatch rangeAtIndex:1]] integerValue];
         else
             _position = fallbackPosition;
         return self;
     }
     return nil;
+}
+
+- (NSString *)stringWithExplicitPosition;
+{
+    if (_positionWasExplicit)
+        return self.specifierString;
+    else
+        return [NSString stringWithFormat:@"%%%ld$%@", self.position, [self.specifierString substringFromIndex:1]];
 }
 
 - (NSUInteger)hash;
