@@ -475,7 +475,7 @@ typedef enum {
          */
 #define POSITION_RE  @"(\\d+\\$)"
 #define FS_FLAG_CHARSET  @"-'+ #0"
-#define LENGTH_MODIFIER_RE @"[hqLztj]?" // IEEE spec has more, CFString docs has these
+#define LENGTH_MODIFIER_RE @"[hl]?[hljztLq]?" // Only CFString docs has "q"
         // Indirect field widths and precisions are not supported. (They introduce a dependency on another position.)
         formatStringSpecifierRegExp = [NSRegularExpression regularExpressionWithPattern:
                                        @"%"POSITION_RE"?["FS_FLAG_CHARSET"]?\\d*\\.?\\d*"LENGTH_MODIFIER_RE"["TERMINATING_CHARSET"]" options:0 error:NULL];
