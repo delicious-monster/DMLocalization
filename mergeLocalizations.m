@@ -32,6 +32,9 @@ typedef enum {
 @end
 
 
+static NSString *const DMDoNotLocalizeMarker = @"????";
+
+
 int main(int argc, const char *argv[])
 {
     @autoreleasepool {
@@ -135,6 +138,7 @@ int main(int argc, const char *argv[])
             for (NSString *lproj in targetLanguageLprojs) {
                 DMLocalizationMapping *mapping = [translationTables objectForKey:lproj];
                 NSMutableString *localizedTranscription = [NSMutableString string];
+                NSMutableString *savedTranscriptionForDoNotLocalize = localizedTranscription;
                 NSScanner *scanner = [NSScanner scannerWithString:devStringsContents];
                 scanner.charactersToBeSkipped = nil;
                 
@@ -206,6 +210,9 @@ int main(int argc, const char *argv[])
                             if (!unquotedStringToken)
                                 break;
                             if (parseState == DMStateExpectingKey) {
+                                if ([unquotedStringToken rangeOfString:DMDoNotLocalizeMarker].length > 0)
+                                    localizedTranscription = nil; // Short-circuit until we hit the end of this key
+                                
                                 lastDevFormatString = [[DMFormatString alloc] initWithString:unquotedStringToken];
                                 if (!lastDevFormatString) {
                                     fputs([[NSString stringWithFormat:@"%@: Error: Invalid key format string %@\n", devStringsPath, unquotedStringToken] UTF8String], stderr);
@@ -245,6 +252,7 @@ int main(int argc, const char *argv[])
                                         break; // No attention needed
                                 }
                                 parseState = DMStateExpectingKey;
+                                localizedTranscription = savedTranscriptionForDoNotLocalize; // Will already be the same unless localization was disabled for a pair
                             } else
                                 fputs([[NSString stringWithFormat:@"%@: Error: Expected to read semicolon\n", devStringsPath] UTF8String], stderr);
                             break;
