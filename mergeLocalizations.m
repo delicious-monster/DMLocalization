@@ -12,7 +12,7 @@
 @interface DMFormatString : NSObject <NSCopying>
 - (id)initWithString:(NSString *)string;
 - (NSString *)stringByMatchingFormatString:(DMFormatString *)targetFormatString;
-@property (readonly, nonatomic) BOOL formatSpecifierPositionsAreMonotonic;
+@property (readonly, nonatomic) BOOL usesExplicitFormatSpecifierPositions;
 @property (readonly, nonatomic, copy) NSArray *components;
 @property (readonly, nonatomic, copy) NSDictionary *formatSpecifiersByPosition;
 @end
@@ -348,10 +348,11 @@ typedef enum {
 
 @interface DMFormatSpecifier : NSObject
 + (NSCharacterSet *)terminatingCharacterSet;
-- (id)initWithString:(NSString *)potentialSpecifierString positionIfUnspecified:(NSInteger)fallbackPosition;
+- (id)initWithString:(NSString *)potentialSpecifierString positionIfImplicit:(NSInteger)implicitPosition;
 - (NSString *)stringWithExplicitPosition;
 @property (readonly) DMFormatSpecifierType specifierType;
 @property (readonly) NSInteger position; // 1-based
+@property (readonly) BOOL positionWasExplicit;
 @property (readonly, copy) NSString *specifierString; // Starts with %
 @end
 
@@ -359,7 +360,7 @@ typedef enum {
     NSString *_rawString;
 }
 
-@synthesize formatSpecifierPositionsAreMonotonic = _formatSpecifierPositionsAreMonotonic;
+@synthesize usesExplicitFormatSpecifierPositions = _usesExplicitFormatSpecifierPositions;
 @synthesize components = _components; // Array of NSString and DMFormatSpecifier objects interleaved
 @synthesize formatSpecifiersByPosition = _formatSpecifiersByPosition;
 
@@ -376,7 +377,6 @@ typedef enum {
     NSScanner *scanner = [NSScanner scannerWithString:string];
     scanner.charactersToBeSkipped = nil;
     NSInteger specifierPosition = 1;
-    _formatSpecifierPositionsAreMonotonic = YES; // Can change in the loop
     while (![scanner isAtEnd]) {
         __autoreleasing NSString *matchString = nil;
         if ([scanner scanUpToString:@"%" intoString:&matchString]) {
@@ -415,7 +415,7 @@ typedef enum {
         scanSingleCharacter();
         
         DMFormatSpecifier *formatSpecifier = nil;
-        while (!(formatSpecifier = [[DMFormatSpecifier alloc] initWithString:formatSpecifierAccumulator positionIfUnspecified:specifierPosition])) {
+        while (!(formatSpecifier = [[DMFormatSpecifier alloc] initWithString:formatSpecifierAccumulator positionIfImplicit:specifierPosition])) {
             if ([scanner scanUpToCharactersFromSet:[DMFormatSpecifier terminatingCharacterSet] intoString:&matchString])
                 [formatSpecifierAccumulator appendString:matchString];
             if (!scanSingleCharacter())
@@ -423,8 +423,8 @@ typedef enum {
         }
         
         if (formatSpecifier) {
-            if (formatSpecifier.position != specifierPosition)
-                _formatSpecifierPositionsAreMonotonic = NO;
+            if (formatSpecifier.positionWasExplicit)
+                _usesExplicitFormatSpecifierPositions = YES;
             [componentAccumulator addObject:formatSpecifier];
             specifierPosition++;
         } else
@@ -447,7 +447,7 @@ typedef enum {
             DMFormatSpecifier *chosenSpecifier = obj;
             if ([obj isEqual:targetSpecifier])
                 chosenSpecifier = targetSpecifier;
-            [matchedComponents addObject:(self.formatSpecifierPositionsAreMonotonic ? chosenSpecifier : chosenSpecifier.stringWithExplicitPosition)];
+            [matchedComponents addObject:(self.usesExplicitFormatSpecifierPositions ? chosenSpecifier.stringWithExplicitPosition : chosenSpecifier)];
         } else
             NSAssert(NO, @"Bad object in components array");
     }];
@@ -494,12 +494,11 @@ typedef enum {
 @end
 
 
-@implementation DMFormatSpecifier {
-    BOOL _positionWasExplicit;
-}
+@implementation DMFormatSpecifier
 
 @synthesize specifierType = _specifierType;
 @synthesize position = _position;
+@synthesize positionWasExplicit = _positionWasExplicit;
 @synthesize specifierString = _specifierString;
 
 #define TERMINATING_CHARSET  @"dDiuUxXoOfeEgGcCsSpaAF@"
@@ -514,7 +513,7 @@ typedef enum {
     return terminatingCharacterSet;
 }
 
-- (id)initWithString:(NSString *)potentialSpecifierString positionIfUnspecified:(NSInteger)fallbackPosition;
+- (id)initWithString:(NSString *)potentialSpecifierString positionIfImplicit:(NSInteger)implicitPosition;
 {
     static dispatch_once_t onceToken;
     static NSRegularExpression *formatStringSpecifierRegExp, *displayPatternSpecifierRegExp, *ruleEditorSpecifierRegExp;
@@ -551,7 +550,7 @@ typedef enum {
         if ([formatStringMatch rangeAtIndex:1].length > 1)
             _positionWasExplicit = YES, _position = [[potentialSpecifierString substringWithRange:[formatStringMatch rangeAtIndex:1]] integerValue];
         else
-            _position = fallbackPosition;
+            _position = implicitPosition;
         return self;
     }
     displayPatternMatch = [displayPatternSpecifierRegExp firstMatchInString:potentialSpecifierString options:NSMatchingAnchored range:fullRange];
@@ -568,7 +567,7 @@ typedef enum {
         if ([ruleEditorMatch rangeAtIndex:1].length > 1)
             _positionWasExplicit = YES, _position = [[potentialSpecifierString substringWithRange:[ruleEditorMatch rangeAtIndex:1]] integerValue];
         else
-            _position = fallbackPosition;
+            _position = implicitPosition;
         return self;
     }
     return nil;
