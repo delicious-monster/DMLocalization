@@ -558,15 +558,15 @@ typedef enum {
     if (displayPatternMatch) {
         _specifierString = [potentialSpecifierString copy];
         _specifierType = DMFormatSpecifierDisplayPatternType;
-        _positionWasExplicit = YES, _position = [[potentialSpecifierString substringWithRange:[formatStringMatch rangeAtIndex:1]] integerValue];
+        _positionWasExplicit = YES, _position = [[potentialSpecifierString substringWithRange:[displayPatternMatch rangeAtIndex:1]] integerValue];
         return self;
     }
     ruleEditorMatch = [ruleEditorSpecifierRegExp firstMatchInString:potentialSpecifierString options:NSMatchingAnchored range:fullRange];
     if (ruleEditorMatch) {
         _specifierString = [potentialSpecifierString copy];
         _specifierType = DMFormatSpecifierRuleEditorType;
-        if ([formatStringMatch rangeAtIndex:1].length > 1)
-            _positionWasExplicit = YES, _position = [[potentialSpecifierString substringWithRange:[formatStringMatch rangeAtIndex:1]] integerValue];
+        if ([ruleEditorMatch rangeAtIndex:1].length > 1)
+            _positionWasExplicit = YES, _position = [[potentialSpecifierString substringWithRange:[ruleEditorMatch rangeAtIndex:1]] integerValue];
         else
             _position = fallbackPosition;
         return self;
