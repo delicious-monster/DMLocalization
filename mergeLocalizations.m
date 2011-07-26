@@ -81,6 +81,7 @@ int main(int argc, const char *argv[])
          * also storing the name of the strings file in which each pair was found.
          */
         fputs([@"Building translation tables\n" UTF8String], stdout);
+        NSCharacterSet *charactersToTrim = [NSCharacterSet characterSetWithCharactersInString:@"\u261b\u261e"]; // Clean up legacy translation markers ("hand" characters)
         NSMutableDictionary *translationTables = [NSMutableDictionary new]; // lang.lproj to DMLocalizationMapping
         
         for (NSString *lproj in targetLanguageLprojs) {
@@ -104,7 +105,7 @@ int main(int argc, const char *argv[])
                         fputs([[NSString stringWithFormat:@"%@: Warning: Invalid key format string %@\n", stringsPath, devString] UTF8String], stderr);
                         return;
                     }
-                    DMFormatString *localizedFormatString = [[DMFormatString alloc] initWithString:localizedString];
+                    DMFormatString *localizedFormatString = [[DMFormatString alloc] initWithString:[localizedString stringByTrimmingCharactersInSet:charactersToTrim]];
                     if (!localizedFormatString) {
                         fputs([[NSString stringWithFormat:@"%@: Warning: Invalid localized format string %@\n", stringsPath, localizedString] UTF8String], stderr);
                         return;
