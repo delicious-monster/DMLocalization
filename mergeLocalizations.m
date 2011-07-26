@@ -127,6 +127,7 @@ int main(int argc, const char *argv[])
         NSCharacterSet *maybeEndQuotedStringSet = [NSCharacterSet characterSetWithCharactersInString:@"\\\""]; // Double-quote or backslash
         
         for (NSString *devStringsComponent in devLanguageStringsFiles) {
+            fputs([[NSString stringWithFormat:@"Localizing %@\n", devStringsComponent] UTF8String], stdout);
             // We'll parse this file manually to preserve comments and all that
             NSString *devStringsPath = [[resourcesPath stringByAppendingPathComponent:devLanguageLproj] stringByAppendingPathComponent:devStringsComponent];
             NSString *devStringsContents = [NSString stringWithContentsOfFile:devStringsPath usedEncoding:NULL error:NULL];
