@@ -100,6 +100,7 @@ int main(int argc, const char *argv[])
          * also storing the name of the strings file in which each pair was found.
          */
         fputs([@"Building translation tables\n" UTF8String], stdout);
+        BOOL hadParseError = NO;
         NSCharacterSet *charactersToTrim = [NSCharacterSet characterSetWithCharactersInString:@"\u261b\u261e"]; // Clean up legacy translation markers ("hand" characters)
         NSMutableDictionary *translationTables = [NSMutableDictionary new]; // lang.lproj to DMLocalizationMapping
         
@@ -115,6 +116,7 @@ int main(int argc, const char *argv[])
                 NSString *stringsContents = [NSString stringWithContentsOfFile:stringsPath usedEncoding:NULL error:NULL];
                 if (!stringsContents) {
                     fputs([[NSString stringWithFormat:@"%@: Error: Unable to read strings file\n", stringsPath] UTF8String], stderr);
+                    hadParseError = YES;
                     continue;
                 }
                 
@@ -150,13 +152,15 @@ int main(int argc, const char *argv[])
                                         [mapping addLocalization:lastLocalizedFormatString forDevString:lastDevFormatString context:nil];
                                     else
                                         [mapping addLocalization:lastLocalizedFormatString forDevString:lastDevFormatString context:languageSubfile];
-                                }
+                                } else
+                                    hadParseError = YES;
                             default:
                                 break;
                         }
                     } else {
                         NSUInteger replayChars = MIN(20u, scanner.scanLocation);
                         fputs([[NSString stringWithFormat:@"%@: Error: Unexpected token at %lu, around: %@\n", stringsPath, scanner.scanLocation, [scanner.string substringWithRange:NSMakeRange(scanner.scanLocation - replayChars, replayChars)]] UTF8String], stderr);
+                        hadParseError = YES;
                         break; // If we didn't progress, we have a problem
                     }
                 }
@@ -164,6 +168,10 @@ int main(int argc, const char *argv[])
             fputs([[NSString stringWithFormat:@"%@: Read %lu localizations\n", lproj, mapping.count] UTF8String], stdout);
         }
         
+        if (hadParseError) {
+            fputs([[NSString stringWithFormat:@"Parse error building localization tables; aborting.\n"] UTF8String], stderr);
+            return EXIT_FAILURE;
+        }
         
         /*
          * For each development language strings file, build a new localized file for each target language.
