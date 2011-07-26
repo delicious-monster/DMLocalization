@@ -155,7 +155,8 @@ int main(int argc, const char *argv[])
                                 break;
                         }
                     } else {
-                        fputs([[NSString stringWithFormat:@"%@: Error: Unexpected token\n", stringsPath] UTF8String], stderr);
+                        NSUInteger replayChars = MIN(20u, scanner.scanLocation);
+                        fputs([[NSString stringWithFormat:@"%@: Error: Unexpected token at %lu, around: %@\n", stringsPath, scanner.scanLocation, [scanner.string substringWithRange:NSMakeRange(scanner.scanLocation - replayChars, replayChars)]] UTF8String], stderr);
                         break; // If we didn't progress, we have a problem
                     }
                 }
@@ -230,7 +231,8 @@ int main(int argc, const char *argv[])
                                 break;
                         }
                     } else {
-                        fputs([[NSString stringWithFormat:@"%@: Error: Unexpected token\n", devStringsPath] UTF8String], stderr);
+                        NSUInteger replayChars = MIN(20u, scanner.scanLocation);
+                        fputs([[NSString stringWithFormat:@"%@: Error: Unexpected token at %lu, around: %@\n", devStringsPath, scanner.scanLocation, [scanner.string substringWithRange:NSMakeRange(scanner.scanLocation - replayChars, replayChars)]] UTF8String], stderr);
                         break; // If we didn't progress, we have a problem
                     }
                 }
