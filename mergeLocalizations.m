@@ -295,18 +295,27 @@ int main(int argc, const char *argv[])
 - (NSUInteger)count;
 { return [_allMappings count]; }
 
+static BOOL isBetterLocalization(DMFormatString *newLocalizedString, DMFormatString *previousString, DMFormatString *devFormatString)
+{
+    if (previousString) {
+        if ([previousString isEqual:newLocalizedString])
+            return NO;
+        else if ([newLocalizedString isEqual:devFormatString])
+            return NO; // A localized string that's the same as the source is probably unlocalized (so not preferred)
+    }
+    return YES;
+}
+
 - (void)addLocalization:(DMFormatString *)localizedFormatString forDevString:(DMFormatString *)devFormatString context:(NSString *)tableName;
 {
-    if ([_allMappings objectForKey:devFormatString]) {
-        // TODO: Decide how to replace
-    }
+    if (isBetterLocalization(localizedFormatString, [_allMappings objectForKey:devFormatString], devFormatString))
+        [_allMappings setObject:localizedFormatString forKey:devFormatString];
     
-    [_allMappings setObject:localizedFormatString forKey:devFormatString];
     NSMutableDictionary *table = [_mappingsByTableName objectForKey:tableName];
     if (!table)
         [_mappingsByTableName setObject:(table = [NSMutableDictionary dictionary]) forKey:tableName];
-    // TODO: Also check replacement here
-    [table setObject:localizedFormatString forKey:devFormatString];
+    if (isBetterLocalization(localizedFormatString, [table objectForKey:devFormatString], devFormatString))
+        [table setObject:localizedFormatString forKey:devFormatString];
 }
 
 - (DMFormatString *)bestLocalizedFormatStringForDevString:(DMFormatString *)devFormatString forContext:(NSString *)tableName matchLevel:(out DMMatchLevel *)outMatchLevel;
