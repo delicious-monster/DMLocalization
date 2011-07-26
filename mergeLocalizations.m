@@ -426,7 +426,13 @@ typedef enum {
 { return self; }
 
 - (NSUInteger)hash;
-{ return [_components hash]; }
+{
+    // NSArray's hash just returns its length, which is useless here because we have thousands of objects, typically with lengths under 4.
+    NSUInteger hashAcc = 0;
+    for (id component in _components)
+        hashAcc ^= [component hash];
+    return hashAcc;
+}
 
 - (BOOL)isEqual:(id)other;
 {
