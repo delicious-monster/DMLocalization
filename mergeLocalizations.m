@@ -140,6 +140,7 @@ int main(int argc, const char *argv[])
                 
                 DMParseState parseState = DMStateExpectingKey;
                 DMFormatString *lastDevFormatString = nil;
+                DMMatchLevel lastFormatStringMatchLevel;
                 while (![scanner isAtEnd]) {
                     __autoreleasing NSString *matchString = nil;
                     
@@ -217,11 +218,9 @@ int main(int argc, const char *argv[])
                                 parseState++;
                             } else if (parseState == DMStateExpectingValue) {
                                 NSCAssert(lastDevFormatString, nil);
-                                DMMatchLevel matchLevel;
-                                DMFormatString *localizedFormatString = [mapping bestLocalizedFormatStringForDevString:lastDevFormatString forContext:devStringsComponent matchLevel:&matchLevel];
+                                DMFormatString *localizedFormatString = [mapping bestLocalizedFormatStringForDevString:lastDevFormatString forContext:devStringsComponent matchLevel:&lastFormatStringMatchLevel];
                                 if (!localizedFormatString) // Use development language
                                     localizedFormatString = [[DMFormatString alloc] initWithString:unquotedStringToken];
-                                // TODO: Comment based on matchLevel
                                 [localizedTranscription appendFormat:@"\"%@\"", [localizedFormatString stringByMatchingFormatString:lastDevFormatString]];
                                 parseState++;
                             }
@@ -237,6 +236,14 @@ int main(int argc, const char *argv[])
                         case DMStateExpectingSemicolon:
                             if ([scanner scanString:@";" intoString:&matchString]) {
                                 [localizedTranscription appendString:matchString];
+                                switch (lastFormatStringMatchLevel) {
+                                    case DMMatchNone:
+                                        [localizedTranscription appendString:@" /*!!!*/"]; break;
+                                    case DMMatchDifferentContext:
+                                        [localizedTranscription appendString:@" /*???*/"]; break;
+                                    case DMMatchSameContext:
+                                        break; // No attention needed
+                                }
                                 parseState = DMStateExpectingKey;
                             } else
                                 fputs([[NSString stringWithFormat:@"%@: Error: Expected to read semicolon\n", devStringsPath] UTF8String], stderr);
