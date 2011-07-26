@@ -45,10 +45,11 @@ typedef enum {
 - (id)initWithName:(NSString *)mappingName; // Name just for debugging
 - (NSUInteger)count;
 - (void)addLocalization:(DMFormatString *)localizedFormatString forDevString:(DMFormatString *)devFormatString context:(NSString *)tableNameOrNil;
-- (DMFormatString *)bestLocalizedFormatStringForDevString:(DMFormatString *)devFormatString forContext:(NSString *)tableName matchLevel:(out DMMatchLevel *)outMatchLevel;
+- (DMFormatString *)bestLocalizedFormatStringForDevString:(DMFormatString *)devFormatString forContext:(NSString *)tableNameOrNil matchLevel:(out DMMatchLevel *)outMatchLevel;
 @end
 
 
+static NSString *const DMOrphanedStringsFilename = @"_orphaned.strings";
 static NSString *const DMDoNotLocalizeMarker = @"????";
 static NSString *const DMNeedsLocalizationMarker = @" /*!!!*/";
 static NSString *const DMLocalizationOutOfContextMarker = @" /*???*/";
@@ -103,10 +104,13 @@ int main(int argc, const char *argv[])
         BOOL hadParseError = NO;
         NSCharacterSet *charactersToTrim = [NSCharacterSet characterSetWithCharactersInString:@"\u261b\u261e"]; // Clean up legacy translation markers ("hand" characters)
         NSMutableDictionary *translationTables = [NSMutableDictionary new]; // lang.lproj to DMLocalizationMapping
+        NSMutableDictionary *unusedLocalizations = [NSMutableDictionary new]; // lang.lproj to NSMutableSet of DMFormatString
         
         for (NSString *lproj in targetLanguageLprojs) {
             DMLocalizationMapping *mapping = [[DMLocalizationMapping alloc] initWithName:lproj];
             [translationTables setObject:mapping forKey:lproj];
+            NSMutableSet *localizationKeys = [NSMutableSet set];
+            [unusedLocalizations setObject:localizationKeys forKey:lproj];
             
             NSString *langaugeProjPath = [sourcePath stringByAppendingPathComponent:lproj];
             for (NSString *languageSubfile in [fm contentsOfDirectoryAtPath:langaugeProjPath error:NULL]) {
@@ -148,10 +152,11 @@ int main(int argc, const char *argv[])
                                     if ([scanner scanString:DMNeedsLocalizationMarker intoString:NULL])
                                         break; // Pair wasn't localized
                                     
-                                    if ([scanner scanString:DMLocalizationOutOfContextMarker intoString:NULL])
+                                    if ([scanner scanString:DMLocalizationOutOfContextMarker intoString:NULL] || [languageSubfile isEqual:DMOrphanedStringsFilename])
                                         [mapping addLocalization:lastLocalizedFormatString forDevString:lastDevFormatString context:nil];
                                     else
                                         [mapping addLocalization:lastLocalizedFormatString forDevString:lastDevFormatString context:languageSubfile];
+                                    [localizationKeys addObject:lastDevFormatString];
                                 } else
                                     hadParseError = YES;
                             default:
@@ -184,6 +189,8 @@ int main(int argc, const char *argv[])
             
             for (NSString *lproj in targetLanguageLprojs) {
                 DMLocalizationMapping *mapping = [translationTables objectForKey:lproj];
+                NSMutableSet *unusedLocalizationKeys = [unusedLocalizations objectForKey:lproj];
+                
                 NSMutableString *localizedTranscription = [NSMutableString string];
                 NSMutableString *savedTranscriptionForDoNotLocalize = localizedTranscription;
                 DMStringsFileScanner *scanner = [[DMStringsFileScanner alloc] initWithString:devStringsContents];
@@ -221,6 +228,7 @@ int main(int argc, const char *argv[])
                                 DMFormatString *localizedFormatString = [mapping bestLocalizedFormatStringForDevString:lastDevFormatString forContext:devStringsComponent matchLevel:&lastFormatStringMatchLevel];
                                 if (!localizedFormatString) // Use development language
                                     localizedFormatString = [[DMFormatString alloc] initWithString:[DMStringsFileScanner unquotedString:matchString if:stringTokenIsQuoted]];
+                                [unusedLocalizationKeys removeObject:lastDevFormatString];
                                 [localizedTranscription appendFormat:@"\"%@\"", [localizedFormatString stringByMatchingFormatString:lastDevFormatString]];
                                 break;
                             }
@@ -255,24 +263,43 @@ int main(int argc, const char *argv[])
             }
         }
         
-        
         /*
          * Remove strings files no longer present in the development language.
          */
         for (NSString *lproj in targetLanguageLprojs) {
             NSString *langaugeProjPath = [sourcePath stringByAppendingPathComponent:lproj];
             for (NSString *languageSubfile in [fm contentsOfDirectoryAtPath:langaugeProjPath error:NULL]) {
-                if (![devLanguageStringsFiles containsObject:languageSubfile]) {
+                if ([languageSubfile.pathExtension isEqual:@"strings"] && ![devLanguageStringsFiles containsObject:languageSubfile]) {
                     fputs([[NSString stringWithFormat:@"Removing source directory strings file %@/%@\n", lproj, languageSubfile] UTF8String], stdout);
-                    //[fm removeItemAtPath:stringsPath error:NULL]; // TODO: Uncomment post-testing
+                    [fm removeItemAtPath:[langaugeProjPath stringByAppendingPathComponent:languageSubfile] error:NULL];
                 }
             }
         }
         
-        
         /*
-         * Write orphaned translations somewhere?
+         * Write orphaned translations
          */
+        for (NSString *lproj in targetLanguageLprojs) {
+            DMLocalizationMapping *mapping = [translationTables objectForKey:lproj];
+            NSMutableString *unusedLocalizedStrings = [NSMutableString stringWithFormat:@"/* Orphaned localized strings for %@ */", lproj];
+            NSUInteger orphanedStringCount = 0;
+            for (DMFormatString *unusedDevFormatString in [unusedLocalizations objectForKey:lproj]) {
+                DMFormatString *localizedFormatString = [mapping bestLocalizedFormatStringForDevString:unusedDevFormatString forContext:nil matchLevel:NULL];
+                if (![unusedDevFormatString isEqual:localizedFormatString]) { // Final check: Don't write strings that are the same
+                    orphanedStringCount++;
+                    [unusedLocalizedStrings appendFormat:@"\n\"%@\" = \"%@\";\n",
+                     [unusedDevFormatString stringByMatchingFormatString:unusedDevFormatString],
+                     [localizedFormatString stringByMatchingFormatString:unusedDevFormatString]];
+                }
+            }
+            
+            if (orphanedStringCount == 0)
+                continue;
+            NSString *orphanedStringsFilePath = [[sourcePath stringByAppendingPathComponent:lproj] stringByAppendingPathComponent:DMOrphanedStringsFilename];
+            [unusedLocalizedStrings writeToFile:orphanedStringsFilePath atomically:YES encoding:NSUTF8StringEncoding error:NULL];
+            fputs([[NSString stringWithFormat:@"Wrote %lu orphaned strings for %@\n", orphanedStringCount, lproj] UTF8String], stdout);
+            
+        }
     }
     return EXIT_SUCCESS;
 }
@@ -498,14 +525,17 @@ static BOOL isBetterLocalization(DMFormatString *newLocalizedString, DMFormatStr
         [table setObject:localizedFormatString forKey:devFormatString];
 }
 
-- (DMFormatString *)bestLocalizedFormatStringForDevString:(DMFormatString *)devFormatString forContext:(NSString *)tableName matchLevel:(out DMMatchLevel *)outMatchLevel;
+- (DMFormatString *)bestLocalizedFormatStringForDevString:(DMFormatString *)devFormatString forContext:(NSString *)tableNameOrNil matchLevel:(out DMMatchLevel *)outMatchLevel;
 {
     if (!devFormatString)
         return nil;
-    DMFormatString *localizedFormatString = [[_mappingsByTableName objectForKey:tableName] objectForKey:devFormatString];
-    if (outMatchLevel) *outMatchLevel = DMMatchSameContext;
-    if (localizedFormatString)
-        return localizedFormatString;
+    DMFormatString *localizedFormatString = nil;
+    if (tableNameOrNil) {
+        localizedFormatString = [[_mappingsByTableName objectForKey:tableNameOrNil] objectForKey:devFormatString];
+        if (outMatchLevel) *outMatchLevel = DMMatchSameContext;
+        if (localizedFormatString)
+            return localizedFormatString;
+    }
     
     localizedFormatString = [_allMappings objectForKey:devFormatString];
     if (outMatchLevel) *outMatchLevel = DMMatchDifferentContext;
