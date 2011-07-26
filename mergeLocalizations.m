@@ -9,6 +9,23 @@
 #import <Foundation/Foundation.h>
 
 
+typedef enum {
+    DMStringsFileTokenComment,
+    DMStringsFileTokenWhitespace,
+    DMStringsFileTokenKeyString,
+    DMStringsFileTokenPairSeparator,
+    DMStringsFileTokenValueString,
+    DMStringsFileTokenPairTerminator,
+} DMStringsFileTokenType;
+
+@interface DMStringsFileScanner : NSScanner
+@property (nonatomic, copy) NSString *filePathForErrorLog;
+- (BOOL)scanNextValidStringsTokenIntoString:(out NSString **)outString tokenType:(out DMStringsFileTokenType *)outTokenType stringQuoted:(out BOOL *)outStringIsQuoted;
+- (BOOL)scanCommentIntoString:(out NSString **)outString;
+- (BOOL)scanPossiblyQuotedStringIntoString:(out NSString **)outString quoted:(out BOOL *)outStringIsQuoted;
++ (NSString *)unquotedString:(NSString *)stringMaybeWithQuotes if:(BOOL)flag;
+@end
+
 @interface DMFormatString : NSObject <NSCopying>
 - (id)initWithString:(NSString *)string;
 - (NSString *)stringByMatchingFormatString:(DMFormatString *)targetFormatString;
@@ -27,12 +44,14 @@ typedef enum {
 // Strings stored here should have the necessary characters escaped (specifically double-quotes)
 - (id)initWithName:(NSString *)mappingName; // Name just for debugging
 - (NSUInteger)count;
-- (void)addLocalization:(DMFormatString *)localizedFormatString forDevString:(DMFormatString *)devFormatString context:(NSString *)tableName;
+- (void)addLocalization:(DMFormatString *)localizedFormatString forDevString:(DMFormatString *)devFormatString context:(NSString *)tableNameOrNil;
 - (DMFormatString *)bestLocalizedFormatStringForDevString:(DMFormatString *)devFormatString forContext:(NSString *)tableName matchLevel:(out DMMatchLevel *)outMatchLevel;
 @end
 
 
 static NSString *const DMDoNotLocalizeMarker = @"????";
+static NSString *const DMNeedsLocalizationMarker = @" /*!!!*/";
+static NSString *const DMLocalizationOutOfContextMarker = @" /*???*/";
 
 
 int main(int argc, const char *argv[])
@@ -93,25 +112,53 @@ int main(int argc, const char *argv[])
                 if (![languageSubfile.pathExtension isEqual:@"strings"])
                     continue;
                 NSString *stringsPath = [langaugeProjPath stringByAppendingPathComponent:languageSubfile];
-                NSDictionary *localizedStrings = [NSDictionary dictionaryWithContentsOfFile:stringsPath];
-                if (!localizedStrings) {
+                NSString *stringsContents = [NSString stringWithContentsOfFile:stringsPath usedEncoding:NULL error:NULL];
+                if (!stringsContents) {
                     fputs([[NSString stringWithFormat:@"%@: Error: Unable to read strings file\n", stringsPath] UTF8String], stderr);
                     continue;
                 }
                 
-                [localizedStrings enumerateKeysAndObjectsUsingBlock:^(NSString *devString, NSString *localizedString, BOOL *stop) {
-                    DMFormatString *devFormatString = [[DMFormatString alloc] initWithString:devString];
-                    if (!devFormatString) {
-                        fputs([[NSString stringWithFormat:@"%@: Warning: Invalid key format string %@\n", stringsPath, devString] UTF8String], stderr);
-                        return;
+                DMStringsFileScanner *scanner = [[DMStringsFileScanner alloc] initWithString:stringsContents];
+                scanner.filePathForErrorLog = stringsPath;
+                
+                DMFormatString *lastDevFormatString = nil, *lastLocalizedFormatString = nil;
+                while (![scanner isAtEnd]) {
+                    __autoreleasing NSString *matchString = nil;
+                    DMStringsFileTokenType scannedToken;
+                    BOOL stringTokenIsQuoted;
+                    
+                    if ([scanner scanNextValidStringsTokenIntoString:&matchString tokenType:&scannedToken stringQuoted:&stringTokenIsQuoted]) {
+                        switch (scannedToken) {
+                            case DMStringsFileTokenKeyString:
+                                lastDevFormatString = [[DMFormatString alloc] initWithString:[DMStringsFileScanner unquotedString:matchString if:stringTokenIsQuoted]];
+                                if (!lastDevFormatString)
+                                    fputs([[NSString stringWithFormat:@"%@: Warning: Invalid key format string %@\n", stringsPath, matchString] UTF8String], stderr);
+                                break;
+                                
+                            case DMStringsFileTokenValueString:
+                                lastLocalizedFormatString = [[DMFormatString alloc] initWithString:[[DMStringsFileScanner unquotedString:matchString if:stringTokenIsQuoted] stringByTrimmingCharactersInSet:charactersToTrim]];
+                                if (!lastLocalizedFormatString)
+                                    fputs([[NSString stringWithFormat:@"%@: Warning: Invalid localized format string %@\n", stringsPath, matchString] UTF8String], stderr);
+                                break;
+                                
+                            case DMStringsFileTokenPairTerminator:
+                                if (lastDevFormatString && lastLocalizedFormatString) {
+                                    if ([scanner scanString:DMNeedsLocalizationMarker intoString:NULL])
+                                        break; // Pair wasn't localized
+                                    
+                                    if ([scanner scanString:DMLocalizationOutOfContextMarker intoString:NULL])
+                                        [mapping addLocalization:lastLocalizedFormatString forDevString:lastDevFormatString context:nil];
+                                    else
+                                        [mapping addLocalization:lastLocalizedFormatString forDevString:lastDevFormatString context:languageSubfile];
+                                }
+                            default:
+                                break;
+                        }
+                    } else {
+                        fputs([[NSString stringWithFormat:@"%@: Error: Unexpected token\n", stringsPath] UTF8String], stderr);
+                        break; // If we didn't progress, we have a problem
                     }
-                    DMFormatString *localizedFormatString = [[DMFormatString alloc] initWithString:[localizedString stringByTrimmingCharactersInSet:charactersToTrim]];
-                    if (!localizedFormatString) {
-                        fputs([[NSString stringWithFormat:@"%@: Warning: Invalid localized format string %@\n", stringsPath, localizedString] UTF8String], stderr);
-                        return;
-                    }
-                    [mapping addLocalization:localizedFormatString forDevString:devFormatString context:languageSubfile];
-                }];
+                }
             }
             fputs([[NSString stringWithFormat:@"%@: Read %lu localizations\n", lproj, mapping.count] UTF8String], stdout);
         }
@@ -120,16 +167,6 @@ int main(int argc, const char *argv[])
         /*
          * For each development language strings file, build a new localized file for each target language.
          */
-        typedef enum {
-            DMStateExpectingKey,
-            DMStateExpectingEquals,
-            DMStateExpectingValue,
-            DMStateExpectingSemicolon,
-        } DMParseState;
-        
-        NSString *startComment = @"/*", *endComment = @"*/";
-        NSCharacterSet *maybeEndQuotedStringSet = [NSCharacterSet characterSetWithCharactersInString:@"\\\""]; // Double-quote or backslash
-        
         for (NSString *devStringsComponent in devLanguageStringsFiles) {
             fputs([[NSString stringWithFormat:@"Localizing %@\n", devStringsComponent] UTF8String], stdout);
             // We'll parse this file manually to preserve comments and all that
@@ -140,127 +177,62 @@ int main(int argc, const char *argv[])
                 DMLocalizationMapping *mapping = [translationTables objectForKey:lproj];
                 NSMutableString *localizedTranscription = [NSMutableString string];
                 NSMutableString *savedTranscriptionForDoNotLocalize = localizedTranscription;
-                NSScanner *scanner = [NSScanner scannerWithString:devStringsContents];
-                scanner.charactersToBeSkipped = nil;
+                DMStringsFileScanner *scanner = [[DMStringsFileScanner alloc] initWithString:devStringsContents];
+                scanner.filePathForErrorLog = devStringsPath;
                 
-                DMParseState parseState = DMStateExpectingKey;
                 DMFormatString *lastDevFormatString = nil;
                 DMMatchLevel lastFormatStringMatchLevel;
                 while (![scanner isAtEnd]) {
                     __autoreleasing NSString *matchString = nil;
+                    DMStringsFileTokenType scannedToken;
+                    BOOL stringTokenIsQuoted;
                     
-                    // Maybe scan comment
-                    if ([scanner scanString:startComment intoString:&matchString]) {
-                        [localizedTranscription appendString:matchString];
-                        if ([scanner scanUpToString:endComment intoString:&matchString])
-                            [localizedTranscription appendString:matchString];
-                        if ([scanner scanString:endComment intoString:&matchString])
-                            [localizedTranscription appendString:matchString];
-                        else {
-                            fputs([[NSString stringWithFormat:@"%@: Error: Expected to read \"%@\"\n", devStringsPath, endComment] UTF8String], stderr);
-                            break;
-                        }
-                        continue;
-                    }
-                    
-                    // Maybe scan whitespace (outside of anything else)
-                    if ([scanner scanCharactersFromSet:[NSCharacterSet whitespaceAndNewlineCharacterSet] intoString:&matchString]) {
-                        [localizedTranscription appendString:matchString];
-                        continue;
-                    }
-                    
-                    // Scan tokens
-                    DMParseState previousParseState = parseState;
-                    switch (parseState) {
-                        case DMStateExpectingKey:
-                        case DMStateExpectingValue: {
-                            // Read a quoted or unquoted string
-                            BOOL stringTokenNeededQuotes = YES;
-                            NSString *unquotedStringToken = nil;
-                            if ([scanner scanString:@"\"" intoString:&matchString]) {
-                                NSMutableString *quotedString = [NSMutableString string];
-                                [quotedString appendString:matchString];
-                                BOOL quotedStringTerminated = NO;
-                                while (!quotedStringTerminated && ![scanner isAtEnd]) {
-                                    if ([scanner scanUpToCharactersFromSet:maybeEndQuotedStringSet intoString:&matchString])
-                                        [quotedString appendString:matchString];
-                                    
-                                    if ([scanner scanString:@"\"" intoString:&matchString]) // Final quote
-                                        [quotedString appendString:matchString], quotedStringTerminated = YES;
-                                    else if ([scanner scanString:@"\\" intoString:&matchString]) { // Skip the backslash and the next character
-                                        [quotedString appendString:matchString];
-                                        if ([scanner isAtEnd]) break;
-                                        NSString *followingCharacterString = [scanner.string substringWithRange:NSMakeRange(scanner.scanLocation, 1)];
-                                        [quotedString appendString:followingCharacterString];
-                                        scanner.scanLocation += 1;
-                                    } else
-                                        break;
-                                }
-                                
-                                if (quotedStringTerminated)
-                                    unquotedStringToken = [quotedString substringWithRange:NSMakeRange(1, quotedString.length - 2)];
-                                else
-                                    fputs([[NSString stringWithFormat:@"%@: Error: Unterminated string: %@\n", devStringsPath, [quotedString substringToIndex:MIN(quotedString.length, 10u)]] UTF8String], stderr);
-                                
-                            } else if ([scanner scanUpToCharactersFromSet:[NSCharacterSet whitespaceAndNewlineCharacterSet] intoString:&matchString]) {
-                                unquotedStringToken = matchString, stringTokenNeededQuotes = NO;
-                            } else
-                                fputs([[NSString stringWithFormat:@"%@: Error: Expected to read quoted string\n", devStringsPath] UTF8String], stderr);
-                            
-                            // Process the tokenized string
-                            if (!unquotedStringToken)
+                    if ([scanner scanNextValidStringsTokenIntoString:&matchString tokenType:&scannedToken stringQuoted:&stringTokenIsQuoted]) {
+                        switch (scannedToken) {
+                            case DMStringsFileTokenComment:
+                            case DMStringsFileTokenWhitespace:
+                            case DMStringsFileTokenPairSeparator:
+                                [localizedTranscription appendString:matchString];
                                 break;
-                            if (parseState == DMStateExpectingKey) {
-                                if ([unquotedStringToken rangeOfString:DMDoNotLocalizeMarker].length > 0)
+                                
+                            case DMStringsFileTokenKeyString:
+                                if ([matchString rangeOfString:DMDoNotLocalizeMarker].length > 0)
                                     localizedTranscription = nil; // Short-circuit until we hit the end of this key
                                 
-                                lastDevFormatString = [[DMFormatString alloc] initWithString:unquotedStringToken];
+                                lastDevFormatString = [[DMFormatString alloc] initWithString:[DMStringsFileScanner unquotedString:matchString if:stringTokenIsQuoted]];
                                 if (!lastDevFormatString) {
-                                    fputs([[NSString stringWithFormat:@"%@: Error: Invalid key format string %@\n", devStringsPath, unquotedStringToken] UTF8String], stderr);
+                                    fputs([[NSString stringWithFormat:@"%@: Error: Invalid key format string %@\n", devStringsPath, matchString] UTF8String], stderr);
                                     exit(EXIT_FAILURE);
                                 }
-                                if (stringTokenNeededQuotes)
-                                    [localizedTranscription appendFormat:@"\"%@\"", unquotedStringToken];
-                                else
-                                    [localizedTranscription appendString:unquotedStringToken];
-                                parseState++;
-                            } else if (parseState == DMStateExpectingValue) {
+                                [localizedTranscription appendString:matchString];
+                                break;
+                                
+                            case DMStringsFileTokenValueString: {
                                 NSCAssert(lastDevFormatString, nil);
                                 DMFormatString *localizedFormatString = [mapping bestLocalizedFormatStringForDevString:lastDevFormatString forContext:devStringsComponent matchLevel:&lastFormatStringMatchLevel];
                                 if (!localizedFormatString) // Use development language
-                                    localizedFormatString = [[DMFormatString alloc] initWithString:unquotedStringToken];
+                                    localizedFormatString = [[DMFormatString alloc] initWithString:[DMStringsFileScanner unquotedString:matchString if:stringTokenIsQuoted]];
                                 [localizedTranscription appendFormat:@"\"%@\"", [localizedFormatString stringByMatchingFormatString:lastDevFormatString]];
-                                parseState++;
+                                break;
                             }
-                            break;
-                        }
-                        case DMStateExpectingEquals:
-                            if ([scanner scanString:@"=" intoString:&matchString]) {
-                                [localizedTranscription appendString:matchString];
-                                parseState++;
-                            } else
-                                fputs([[NSString stringWithFormat:@"%@: Error: Expected to read equals\n", devStringsPath] UTF8String], stderr);
-                            break;
-                        case DMStateExpectingSemicolon:
-                            if ([scanner scanString:@";" intoString:&matchString]) {
+                            case DMStringsFileTokenPairTerminator:
                                 [localizedTranscription appendString:matchString];
                                 switch (lastFormatStringMatchLevel) {
                                     case DMMatchNone:
-                                        [localizedTranscription appendString:@" /*!!!*/"]; break;
+                                        [localizedTranscription appendString:DMNeedsLocalizationMarker]; break;
                                     case DMMatchDifferentContext:
-                                        [localizedTranscription appendString:@" /*???*/"]; break;
+                                        [localizedTranscription appendString:DMLocalizationOutOfContextMarker]; break;
                                     case DMMatchSameContext:
                                         break; // No attention needed
                                 }
-                                parseState = DMStateExpectingKey;
                                 localizedTranscription = savedTranscriptionForDoNotLocalize; // Will already be the same unless localization was disabled for a pair
-                            } else
-                                fputs([[NSString stringWithFormat:@"%@: Error: Expected to read semicolon\n", devStringsPath] UTF8String], stderr);
-                            break;
-                    }
-                    
-                    if (parseState == previousParseState)
+                                lastDevFormatString = nil;
+                                break;
+                        }
+                    } else {
+                        fputs([[NSString stringWithFormat:@"%@: Error: Unexpected token\n", devStringsPath] UTF8String], stderr);
                         break; // If we didn't progress, we have a problem
+                    }
                 }
                 
                 if (![scanner isAtEnd]) // We didn't process the file completely
@@ -296,6 +268,182 @@ int main(int argc, const char *argv[])
 }
 
 
+typedef enum {
+    DMStateExpectingKey,
+    DMStateExpectingEquals,
+    DMStateExpectingValue,
+    DMStateExpectingSemicolon,
+} DMParseState;
+
+@implementation DMStringsFileScanner {
+    DMParseState _parseState;
+    NSScanner *_scanner; // Must compose because NSScanner is a class cluster
+}
+
+@synthesize filePathForErrorLog;
+
+- (id)initWithString:(NSString *)string;
+{
+    if (!(self = [super initWithString:@""]))
+        return nil;
+    _scanner = [[NSScanner alloc] initWithString:string];
+    self.charactersToBeSkipped = nil;
+    _parseState = DMStateExpectingKey;
+    return self;
+}
+
+- (BOOL)scanNextValidStringsTokenIntoString:(out NSString **)outString tokenType:(out DMStringsFileTokenType *)outTokenType stringQuoted:(out BOOL *)outStringIsQuoted;
+{
+    if ([self isAtEnd])
+        return NO;
+    __autoreleasing NSString *matchString = nil;
+    
+    // Maybe scan comment
+    if ([self scanCommentIntoString:&matchString]) {
+        if (outTokenType) *outTokenType = DMStringsFileTokenComment;
+        if (outString) *outString = matchString;
+        return YES;
+    }
+    
+    // Maybe scan whitespace (outside of anything else)
+    if ([_scanner scanCharactersFromSet:[NSCharacterSet whitespaceAndNewlineCharacterSet] intoString:&matchString]) {
+        if (outTokenType) *outTokenType = DMStringsFileTokenWhitespace;
+        if (outString) *outString = matchString;
+        return YES;
+    }
+    
+    // Scan content
+    switch (_parseState) {
+        case DMStateExpectingKey:
+        case DMStateExpectingValue: {
+            // Read a quoted or unquoted string
+            BOOL stringTokenQuoted = YES;
+            if ([self scanPossiblyQuotedStringIntoString:&matchString quoted:&stringTokenQuoted]) {
+                if (outTokenType) *outTokenType = (_parseState == DMStateExpectingKey) ? DMStringsFileTokenKeyString : DMStringsFileTokenValueString;
+                if (outString) *outString = matchString;
+                if (outStringIsQuoted) *outStringIsQuoted = stringTokenQuoted;
+                _parseState++;
+                return YES;
+            } else
+                return NO;
+        }
+        case DMStateExpectingEquals:
+            if ([_scanner scanString:@"=" intoString:&matchString]) {
+                if (outTokenType) *outTokenType = DMStringsFileTokenPairSeparator;
+                if (outString) *outString = matchString;
+                _parseState++;
+                return YES;
+            } else
+                return NO;
+        case DMStateExpectingSemicolon:
+            if ([_scanner scanString:@";" intoString:&matchString]) {
+                if (outTokenType) *outTokenType = DMStringsFileTokenPairTerminator;
+                if (outString) *outString = matchString;
+                _parseState = DMStateExpectingKey;
+                return YES;
+            } else
+                return NO;
+    }
+    return NO;
+}
+
+- (BOOL)scanCommentIntoString:(out NSString **)outString;
+{
+    static NSString *startComment = @"/*", *endComment = @"*/";
+    NSMutableString *accumulator = [NSMutableString string];
+    __autoreleasing NSString *matchString;
+    
+    if ([_scanner scanString:startComment intoString:&matchString]) {
+        [accumulator appendString:matchString];
+        if ([_scanner scanUpToString:endComment intoString:&matchString])
+            [accumulator appendString:matchString];
+        if ([_scanner scanString:endComment intoString:&matchString])
+            [accumulator appendString:matchString];
+        else {
+            fputs([[NSString stringWithFormat:@"%@: Error: Expected to read \"%@\"\n", self.filePathForErrorLog, endComment] UTF8String], stderr);
+            return NO;
+        }
+        if (outString)
+            *outString = accumulator;
+        return YES;
+    }
+    return NO;
+}
+
+- (BOOL)scanPossiblyQuotedStringIntoString:(out NSString **)outString quoted:(out BOOL *)outStringIsQuoted;
+{
+    static dispatch_once_t onceToken;
+    static NSCharacterSet *maybeEndQuotedStringSet;
+    dispatch_once(&onceToken, ^{
+        maybeEndQuotedStringSet = [NSCharacterSet characterSetWithCharactersInString:@"\\\""]; // Double-quote or backslash
+    });
+    __autoreleasing NSString *matchString;
+    
+    NSString *stringToken = nil;
+    if ([_scanner scanString:@"\"" intoString:&matchString]) {
+        NSMutableString *quotedString = [NSMutableString string];
+        [quotedString appendString:matchString];
+        BOOL quotedStringTerminated = NO;
+        while (!quotedStringTerminated && ![self isAtEnd]) {
+            if ([_scanner scanUpToCharactersFromSet:maybeEndQuotedStringSet intoString:&matchString])
+                [quotedString appendString:matchString];
+            
+            if ([_scanner scanString:@"\"" intoString:&matchString]) // Final quote
+                [quotedString appendString:matchString], quotedStringTerminated = YES;
+            else if ([_scanner scanString:@"\\" intoString:&matchString]) { // Skip the backslash and the next character
+                [quotedString appendString:matchString];
+                if ([self isAtEnd]) break;
+                NSString *followingCharacterString = [self.string substringWithRange:NSMakeRange(self.scanLocation, 1)];
+                [quotedString appendString:followingCharacterString];
+                self.scanLocation += 1;
+            } else
+                break;
+        }
+        
+        if (quotedStringTerminated) {
+            stringToken = quotedString;
+            if (outStringIsQuoted) *outStringIsQuoted = YES;
+        } else
+            fputs([[NSString stringWithFormat:@"%@: Error: Unterminated string: %@\n", self.filePathForErrorLog, [quotedString substringToIndex:MIN(quotedString.length, 10u)]] UTF8String], stderr);
+    } else if ([_scanner scanUpToCharactersFromSet:[NSCharacterSet whitespaceAndNewlineCharacterSet] intoString:&matchString]) {
+        stringToken = matchString;
+        if (outStringIsQuoted) *outStringIsQuoted = NO;
+    }
+    
+    if (stringToken && outString)
+        *outString = stringToken;
+    return (stringToken != nil);
+}
+
++ (NSString *)unquotedString:(NSString *)stringMaybeWithQuotes if:(BOOL)flag;
+{
+    return flag ? [stringMaybeWithQuotes substringWithRange:NSMakeRange(1, stringMaybeWithQuotes.length - 2)] : stringMaybeWithQuotes;
+}
+
+// NSScanner bullshit
+
+- (NSString *)string;
+{ return _scanner.string; }
+- (NSUInteger)scanLocation;
+{ return [_scanner scanLocation]; }
+- (void)setScanLocation:(NSUInteger)pos;
+{ [_scanner setScanLocation:pos]; }
+- (BOOL)caseSensitive;
+{ return [_scanner caseSensitive]; }
+- (void)setCaseSensitive:(BOOL)flag;
+{ [_scanner setCaseSensitive:flag]; }
+- (NSCharacterSet *)charactersToBeSkipped;
+{ return [_scanner charactersToBeSkipped]; }
+- (void)setCharactersToBeSkipped:(NSCharacterSet *)set;
+{ [_scanner setCharactersToBeSkipped:set]; }
+- (id)locale;
+{ return [_scanner locale]; }
+- (void)setLocale:(id)locale;
+{ [_scanner setLocale:locale]; }
+
+@end
+
+
 @implementation DMLocalizationMapping {
     NSString *_name;
     NSMutableDictionary *_allMappings;
@@ -326,14 +474,16 @@ static BOOL isBetterLocalization(DMFormatString *newLocalizedString, DMFormatStr
     return YES;
 }
 
-- (void)addLocalization:(DMFormatString *)localizedFormatString forDevString:(DMFormatString *)devFormatString context:(NSString *)tableName;
+- (void)addLocalization:(DMFormatString *)localizedFormatString forDevString:(DMFormatString *)devFormatString context:(NSString *)tableNameOrNil;
 {
     if (isBetterLocalization(localizedFormatString, [_allMappings objectForKey:devFormatString], devFormatString))
         [_allMappings setObject:localizedFormatString forKey:devFormatString];
     
-    NSMutableDictionary *table = [_mappingsByTableName objectForKey:tableName];
+    if (!tableNameOrNil)
+        return;
+    NSMutableDictionary *table = [_mappingsByTableName objectForKey:tableNameOrNil];
     if (!table)
-        [_mappingsByTableName setObject:(table = [NSMutableDictionary dictionary]) forKey:tableName];
+        [_mappingsByTableName setObject:(table = [NSMutableDictionary dictionary]) forKey:tableNameOrNil];
     if (isBetterLocalization(localizedFormatString, [table objectForKey:devFormatString], devFormatString))
         [table setObject:localizedFormatString forKey:devFormatString];
 }
