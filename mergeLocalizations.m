@@ -208,14 +208,11 @@ int main(int argc, const char *argv[])
                                 [localizedTranscription appendFormat:@"\"%@\"", unquotedStringToken];
                                 parseState++;
                             } else if (parseState == DMStateExpectingValue) {
-                                // Ignore unquotedStringToken (it's also in the development language)
                                 NSCAssert(lastDevFormatString, nil);
                                 DMMatchLevel matchLevel;
                                 DMFormatString *localizedFormatString = [mapping bestLocalizedFormatStringForDevString:lastDevFormatString forContext:devStringsComponent matchLevel:&matchLevel];
-                                if (!localizedFormatString) {
-                                    fputs([[NSString stringWithFormat:@"%@: Error: Unable to parse format string: \"%@\"\n", devStringsPath, lastDevFormatString] UTF8String], stderr);
-                                    break;
-                                }
+                                if (!localizedFormatString) // Use development language
+                                    localizedFormatString = [[DMFormatString alloc] initWithString:unquotedStringToken];
                                 // TODO: Comment based on matchLevel
                                 [localizedTranscription appendFormat:@"\"%@\"", [localizedFormatString stringByMatchingFormatString:lastDevFormatString]];
                                 parseState++;
@@ -323,7 +320,7 @@ int main(int argc, const char *argv[])
         return localizedFormatString;
     
     if (outMatchLevel) *outMatchLevel = DMMatchNone;
-    return devFormatString;
+    return nil;
 }
 
 @end
