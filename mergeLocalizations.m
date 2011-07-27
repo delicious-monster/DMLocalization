@@ -270,7 +270,8 @@ int main(int argc, const char *argv[])
             NSString *langaugeProjPath = [sourcePath stringByAppendingPathComponent:lproj];
             for (NSString *languageSubfile in [fm contentsOfDirectoryAtPath:langaugeProjPath error:NULL]) {
                 if ([languageSubfile.pathExtension isEqual:@"strings"] && ![devLanguageStringsFiles containsObject:languageSubfile]) {
-                    fputs([[NSString stringWithFormat:@"Removing source directory strings file %@/%@\n", lproj, languageSubfile] UTF8String], stdout);
+                    if (![languageSubfile isEqual:DMOrphanedStringsFilename])
+                        fputs([[NSString stringWithFormat:@"Removing source directory strings file %@/%@\n", lproj, languageSubfile] UTF8String], stdout);
                     [fm removeItemAtPath:[langaugeProjPath stringByAppendingPathComponent:languageSubfile] error:NULL];
                 }
             }
