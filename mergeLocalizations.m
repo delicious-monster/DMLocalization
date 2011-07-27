@@ -70,7 +70,7 @@ int main(int argc, const char *argv[])
         } else {
             resourcesPath = [@"~/Library/Developer/Xcode/DerivedData/UberLibrary-djzgxxrdrlqezxgaansiwhdraxmn/Build/Products/Debug/Delicious Library 3.app/Contents/Resources" stringByExpandingTildeInPath];
             sourcePath = [@"~/Documents/Streams/Delicious Monster/UberLibrary/Library" stringByExpandingTildeInPath];
-            devLanguageLproj = @"English.lproj";
+            devLanguageLproj = @"en.lproj";
         }
         
         if (![fm fileExistsAtPath:resourcesPath] || ![fm fileExistsAtPath:sourcePath]) {
