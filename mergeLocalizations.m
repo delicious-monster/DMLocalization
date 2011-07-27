@@ -127,6 +127,7 @@ int main(int argc, const char *argv[])
                 DMStringsFileScanner *scanner = [[DMStringsFileScanner alloc] initWithString:stringsContents];
                 scanner.filePathForErrorLog = stringsPath;
                 
+                NSString *lastLocalizedString = nil;
                 DMFormatString *lastDevFormatString = nil, *lastLocalizedFormatString = nil;
                 while (![scanner isAtEnd]) {
                     __autoreleasing NSString *matchString = nil;
@@ -138,27 +139,28 @@ int main(int argc, const char *argv[])
                             case DMStringsFileTokenKeyString:
                                 lastDevFormatString = [[DMFormatString alloc] initWithString:[DMStringsFileScanner unquotedString:matchString if:stringTokenIsQuoted]];
                                 if (!lastDevFormatString)
-                                    fputs([[NSString stringWithFormat:@"%@: Warning: Invalid key format string %@\n", stringsPath, matchString] UTF8String], stderr);
+                                    fputs([[NSString stringWithFormat:@"%@: Warning: Invalid key format string %@\n", stringsPath, matchString] UTF8String], stderr), hadParseError = YES;
                                 break;
                                 
                             case DMStringsFileTokenValueString:
-                                lastLocalizedFormatString = [[DMFormatString alloc] initWithString:[[DMStringsFileScanner unquotedString:matchString if:stringTokenIsQuoted] stringByTrimmingCharactersInSet:charactersToTrim]];
+                                lastLocalizedString = [DMStringsFileScanner unquotedString:matchString if:stringTokenIsQuoted];
+                                lastLocalizedFormatString = [[DMFormatString alloc] initWithString:[lastLocalizedString stringByTrimmingCharactersInSet:charactersToTrim]];
                                 if (!lastLocalizedFormatString)
-                                    fputs([[NSString stringWithFormat:@"%@: Warning: Invalid localized format string %@\n", stringsPath, matchString] UTF8String], stderr);
+                                    fputs([[NSString stringWithFormat:@"%@: Warning: Invalid localized format string %@\n", stringsPath, matchString] UTF8String], stderr), hadParseError = YES;
                                 break;
                                 
                             case DMStringsFileTokenPairTerminator:
                                 if (lastDevFormatString && lastLocalizedFormatString) {
-                                    if ([scanner scanString:DMNeedsLocalizationMarker intoString:NULL])
+                                    // Handle legacy uncertainty markers
+                                    if ([scanner scanString:DMNeedsLocalizationMarker intoString:NULL] || [lastLocalizedString rangeOfString:@"\u261e"].length > 0)
                                         break; // Pair wasn't localized
                                     
-                                    if ([scanner scanString:DMLocalizationOutOfContextMarker intoString:NULL] || [languageSubfile isEqual:DMOrphanedStringsFilename])
+                                    if ([scanner scanString:DMLocalizationOutOfContextMarker intoString:NULL] || [languageSubfile isEqual:DMOrphanedStringsFilename] || [lastLocalizedString rangeOfString:@"\u261b"].length > 0)
                                         [mapping addLocalization:lastLocalizedFormatString forDevString:lastDevFormatString context:nil];
                                     else
                                         [mapping addLocalization:lastLocalizedFormatString forDevString:lastDevFormatString context:languageSubfile];
                                     [localizationKeys addObject:lastDevFormatString];
-                                } else
-                                    hadParseError = YES;
+                                }
                             default:
                                 break;
                         }
