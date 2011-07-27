@@ -152,10 +152,12 @@ int main(int argc, const char *argv[])
                             case DMStringsFileTokenPairTerminator:
                                 if (lastDevFormatString && lastLocalizedFormatString) {
                                     // Handle legacy uncertainty markers
-                                    if ([scanner scanString:DMNeedsLocalizationMarker intoString:NULL] || [lastLocalizedString rangeOfString:@"\u261e"].length > 0)
+                                    BOOL hasLegacyMarker = ([lastLocalizedString rangeOfString:@"\u261b"].length > 0 || [lastLocalizedString rangeOfString:@"\u261e"].length > 0);
+                                    
+                                    if ([scanner scanString:DMNeedsLocalizationMarker intoString:NULL] || (hasLegacyMarker && [lastLocalizedFormatString isEqual:lastDevFormatString]))
                                         break; // Pair wasn't localized
                                     
-                                    if ([scanner scanString:DMLocalizationOutOfContextMarker intoString:NULL] || [languageSubfile isEqual:DMOrphanedStringsFilename] || [lastLocalizedString rangeOfString:@"\u261b"].length > 0)
+                                    if ([scanner scanString:DMLocalizationOutOfContextMarker intoString:NULL] || [languageSubfile isEqual:DMOrphanedStringsFilename] || hasLegacyMarker)
                                         [mapping addLocalization:lastLocalizedFormatString forDevString:lastDevFormatString context:nil];
                                     else
                                         [mapping addLocalization:lastLocalizedFormatString forDevString:lastDevFormatString context:languageSubfile];
