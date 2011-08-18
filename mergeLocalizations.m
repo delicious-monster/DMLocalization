@@ -185,6 +185,8 @@ int main(int argc, const char *argv[])
         /*
          * For each development language strings file, build a new localized file for each target language.
          */
+        NSMutableSet *devStringSet = [NSMutableSet new];
+        NSMutableDictionary *unlocalizedStringRoughCountByLanguage = [NSMutableDictionary new]; // lang.lproj to NSNumber (NSUInteger), the number of strings for which a translation was not available, with fudging to include strings that are supposedly localized but are the same as the development string
         for (NSString *devStringsComponent in devLanguageStringsFiles) {
             fputs([[NSString stringWithFormat:@"Localizing %@\n", devStringsComponent] UTF8String], stdout);
             // We'll parse this file manually to preserve comments and all that
@@ -194,6 +196,7 @@ int main(int argc, const char *argv[])
             for (NSString *lproj in targetLanguageLprojs) {
                 DMLocalizationMapping *mapping = [translationTables objectForKey:lproj];
                 NSMutableSet *unusedLocalizationKeys = [unusedLocalizations objectForKey:lproj];
+                NSUInteger unlocalizedStringRoughCount = [[unlocalizedStringRoughCountByLanguage objectForKey:lproj] unsignedIntegerValue];
                 
                 NSMutableString *localizedTranscription = [NSMutableString string];
                 NSMutableString *savedTranscriptionForDoNotLocalize = localizedTranscription;
@@ -202,6 +205,7 @@ int main(int argc, const char *argv[])
                 
                 DMFormatString *lastDevFormatString = nil;
                 DMMatchLevel lastFormatStringMatchLevel;
+                NSMutableSet *devStringsCountedForLproj = [NSMutableSet new];
                 while (![scanner isAtEnd]) {
                     __autoreleasing NSString *matchString = nil;
                     DMStringsFileTokenType scannedToken;
@@ -219,6 +223,7 @@ int main(int argc, const char *argv[])
                                 if ([matchString rangeOfString:DMDoNotLocalizeMarker].length > 0)
                                     localizedTranscription = nil; // Short-circuit until we hit the end of this key
                                 
+                                [devStringSet addObject:matchString];
                                 lastDevFormatString = [[DMFormatString alloc] initWithString:[DMStringsFileScanner unquotedString:matchString if:stringTokenIsQuoted]];
                                 if (!lastDevFormatString) {
                                     fputs([[NSString stringWithFormat:@"%@: Error: Invalid key format string %@\n", devStringsPath, matchString] UTF8String], stderr);
@@ -232,8 +237,16 @@ int main(int argc, const char *argv[])
                                 DMFormatString *localizedFormatString = [mapping bestLocalizedFormatStringForDevString:lastDevFormatString forContext:devStringsComponent matchLevel:&lastFormatStringMatchLevel];
                                 if (!localizedFormatString) // Use development language
                                     localizedFormatString = [[DMFormatString alloc] initWithString:[DMStringsFileScanner unquotedString:matchString if:stringTokenIsQuoted]];
+                                
+                                NSString *resultString = [localizedFormatString stringByMatchingFormatString:lastDevFormatString];
                                 [unusedLocalizationKeys removeObject:lastDevFormatString];
-                                [localizedTranscription appendFormat:@"\"%@\"", [localizedFormatString stringByMatchingFormatString:lastDevFormatString]];
+                                [localizedTranscription appendFormat:@"\"%@\"", resultString];
+                                
+                                BOOL hasLikelyInvalidLocalization = (lastFormatStringMatchLevel == DMMatchNone || (resultString.length > 10 && [resultString isEqualToString:matchString]));
+                                if (hasLikelyInvalidLocalization && ![devStringsCountedForLproj containsObject:matchString]) {
+                                    [devStringsCountedForLproj addObject:matchString];
+                                    unlocalizedStringRoughCount++;
+                                }
                                 break;
                             }
                             case DMStringsFileTokenPairTerminator:
@@ -260,6 +273,7 @@ int main(int argc, const char *argv[])
                 if (![scanner isAtEnd]) // We didn't process the file completely
                     break; // Break out of processing this strings file for all languages
                 
+                [unlocalizedStringRoughCountByLanguage setObject:[NSNumber numberWithUnsignedInteger:unlocalizedStringRoughCount] forKey:lproj];
                 NSString *localizedStringsPath = [[sourcePath stringByAppendingPathComponent:lproj] stringByAppendingPathComponent:devStringsComponent];
                 __autoreleasing NSError *writeError = nil;
                 if (![localizedTranscription writeToFile:localizedStringsPath atomically:YES encoding:NSUTF8StringEncoding error:&writeError])
@@ -303,7 +317,21 @@ int main(int argc, const char *argv[])
             NSString *orphanedStringsFilePath = [[sourcePath stringByAppendingPathComponent:lproj] stringByAppendingPathComponent:DMOrphanedStringsFilename];
             [unusedLocalizedStrings writeToFile:orphanedStringsFilePath atomically:YES encoding:NSUTF8StringEncoding error:NULL];
             fputs([[NSString stringWithFormat:@"Wrote %lu orphaned strings for %@\n", orphanedStringCount, lproj] UTF8String], stdout);
-            
+        }
+        
+        /*
+         * Print translation statistics by language
+         */
+        fputs("\n---- Approximate statistics ----\n", stdout);
+        const NSUInteger barWidth = 40;
+        for (NSString *lproj in targetLanguageLprojs) {
+            NSUInteger roughUnlocalizedCount = [[unlocalizedStringRoughCountByLanguage objectForKey:lproj] unsignedIntegerValue];
+            float localizedProportion = 1.0 - ((float)roughUnlocalizedCount / (float)devStringSet.count);
+            NSUInteger barCharCount = MAX(MIN(localizedProportion, 1.0), 0.0) * barWidth;
+
+            NSString *paddedLproj = [lproj stringByPaddingToLength:15 withString:@" " startingAtIndex:0];
+            NSString *bar = [[@"" stringByPaddingToLength:barCharCount withString:@"=" startingAtIndex:0] stringByPaddingToLength:barWidth withString:@" " startingAtIndex:0];
+            fputs([[NSString stringWithFormat:@"%@ [%@] %2.f%% localized\n", paddedLproj, bar, localizedProportion * 100.0] UTF8String], stdout);
         }
     }
     return EXIT_SUCCESS;
