@@ -276,6 +276,9 @@ int main(int argc, const char *argv[])
                 if (![scanner isAtEnd]) // We didn't process the file completely
                     break; // Break out of processing this strings file for all languages
                 
+                if ([localizedTranscription characterAtIndex:(localizedTranscription.length - 1)] != '\n')
+                    [localizedTranscription appendString:@"\n"];
+                
                 [unlocalizedStringRoughCountByLanguage setObject:[NSNumber numberWithUnsignedInteger:unlocalizedStringRoughCount] forKey:lproj];
                 NSString *localizedStringsPath = [[sourcePath stringByAppendingPathComponent:lproj] stringByAppendingPathComponent:devStringsComponent];
                 __autoreleasing NSError *writeError = nil;
