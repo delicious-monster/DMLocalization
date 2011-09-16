@@ -51,8 +51,8 @@ typedef enum {
 
 static NSString *const DMOrphanedStringsFilename = @"_orphaned.strings";
 static NSString *const DMDoNotLocalizeMarker = @"????";
-static NSString *const DMNeedsLocalizationMarker = @" /*!!!*/";
-static NSString *const DMLocalizationOutOfContextMarker = @" /*???*/";
+static NSString *const DMNeedsLocalizationMarker = @" /*!!! Needs translation, delete this comment when translated !!!*/";
+static NSString *const DMLocalizationOutOfContextMarker = @" /*!!! Translation found in different context, delete this comment if ok !!!*/";
 
 
 int main(int argc, const char *argv[])
