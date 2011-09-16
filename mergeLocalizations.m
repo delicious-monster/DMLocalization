@@ -30,6 +30,7 @@ typedef enum {
 - (id)initWithString:(NSString *)string;
 - (NSString *)stringByMatchingFormatString:(DMFormatString *)targetFormatString;
 @property (readonly, nonatomic) BOOL usesExplicitFormatSpecifierPositions;
+@property (readonly, nonatomic) BOOL probablyNeedsNoLocalization;
 @property (readonly, nonatomic, copy) NSArray *components;
 @property (readonly, nonatomic, copy) NSDictionary *formatSpecifiersByPosition;
 @end
@@ -241,12 +242,13 @@ int main(int argc, const char *argv[])
                                 if (!localizedFormatString) // Use development language
                                     localizedFormatString = [[DMFormatString alloc] initWithString:[DMStringsFileScanner unquotedString:matchString if:stringTokenIsQuoted]];
                                 
+                                if (lastFormatStringMatchLevel == DMMatchNone && localizedFormatString.probablyNeedsNoLocalization)
+                                    lastFormatStringMatchLevel = DMMatchSameContext; // Default strings that are just punctuation, digits, etc. as localized
                                 NSString *resultString = [localizedFormatString stringByMatchingFormatString:lastDevFormatString];
                                 [unusedLocalizationKeys removeObject:lastDevFormatString];
                                 [localizedTranscription appendFormat:@"\"%@\"", resultString];
                                 
-                                BOOL hasLikelyInvalidLocalization = (lastFormatStringMatchLevel == DMMatchNone || (resultString.length > 10 && [resultString isEqualToString:matchString]));
-                                if (hasLikelyInvalidLocalization && ![devStringsCountedForLproj containsObject:matchString]) {
+                                if (lastFormatStringMatchLevel == DMMatchNone && ![devStringsCountedForLproj containsObject:matchString]) {
                                     [devStringsCountedForLproj addObject:matchString];
                                     unlocalizedStringRoughCount++;
                                 }
@@ -608,6 +610,7 @@ typedef enum {
 @implementation DMFormatString
 
 @synthesize usesExplicitFormatSpecifierPositions = _usesExplicitFormatSpecifierPositions;
+@synthesize probablyNeedsNoLocalization = _probablyNeedsNoLocalization;
 @synthesize components = _components; // Array of NSString and DMFormatSpecifier objects interleaved
 @synthesize formatSpecifiersByPosition = _formatSpecifiersByPosition;
 
@@ -679,6 +682,15 @@ typedef enum {
     if (literalAccumulator.length)
         [componentAccumulator addObject:[literalAccumulator copy]];
     _components = [componentAccumulator copy];
+    
+    BOOL hasBitsNeedingLocalization = NO;
+    for (id component in _components)
+        if ([component isKindOfClass:[NSString class]])
+            if ([component stringByTrimmingCharactersInSet:[[NSCharacterSet letterCharacterSet] invertedSet]].length > 0) {
+                hasBitsNeedingLocalization = YES;
+                break;
+            }
+    _probablyNeedsNoLocalization = !hasBitsNeedingLocalization;
     return self;
 }
 
