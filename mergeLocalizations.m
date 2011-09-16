@@ -49,6 +49,7 @@ typedef enum {
 @end
 
 
+//#define SET_NEEDS_LOCALIZATION_IF_SAME_AS_DEV_STRING
 static NSString *const DMOrphanedStringsFilename = @"_orphaned.strings";
 static NSString *const DMDoNotLocalizeMarker = @"????";
 static NSString *const DMNeedsLocalizationMarker = @" /*!!! Needs translation, delete this comment when translated !!!*/";
@@ -151,13 +152,15 @@ int main(int argc, const char *argv[])
                                 
                             case DMStringsFileTokenPairTerminator:
                                 if (lastDevFormatString && lastLocalizedFormatString) {
-                                    // Handle legacy uncertainty markers
-                                    BOOL hasLegacyMarker = ([lastLocalizedString rangeOfString:@"\u261b"].length > 0 || [lastLocalizedString rangeOfString:@"\u261e"].length > 0);
-                                    
-                                    if ([scanner scanString:DMNeedsLocalizationMarker intoString:NULL] || (hasLegacyMarker && [lastLocalizedFormatString isEqual:lastDevFormatString]))
+                                    if ([scanner scanString:DMNeedsLocalizationMarker intoString:NULL])
                                         break; // Pair wasn't localized
                                     
-                                    if ([scanner scanString:DMLocalizationOutOfContextMarker intoString:NULL] || [languageSubfile isEqual:DMOrphanedStringsFilename] || hasLegacyMarker)
+#ifdef SET_NEEDS_LOCALIZATION_IF_SAME_AS_DEV_STRING
+                                    if ([lastLocalizedFormatString isEqual:lastDevFormatString])
+                                        break;
+#endif
+                                    
+                                    if ([scanner scanString:DMLocalizationOutOfContextMarker intoString:NULL] || [languageSubfile isEqual:DMOrphanedStringsFilename])
                                         [mapping addLocalization:lastLocalizedFormatString forDevString:lastDevFormatString context:nil];
                                     else
                                         [mapping addLocalization:lastLocalizedFormatString forDevString:lastDevFormatString context:languageSubfile];
