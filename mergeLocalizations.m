@@ -656,7 +656,7 @@ typedef enum {
          */
         if ([scanner scanUpToCharactersFromSet:[DMFormatSpecifier terminatingCharacterSet] intoString:&matchString])
             [formatSpecifierAccumulator appendString:matchString];
-        BOOL (^scanSingleCharacter)() = ^{
+        BOOL (^scanSingleCharacter)(void) = ^{
             if ([scanner isAtEnd]) return NO;
             [formatSpecifierAccumulator appendString:[scanner.string substringWithRange:NSMakeRange(scanner.scanLocation, 1)]];
             scanner.scanLocation += 1; return YES;
