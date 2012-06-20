@@ -65,10 +65,10 @@ int main(int argc, const char *argv[])
         
         // Set paths
         NSString *resourcesPath, *sourcePath, *devLanguageLproj;
-        if ([env objectForKey:@"TARGET_BUILD_DIR"]) {
-            resourcesPath = [[env objectForKey:@"TARGET_BUILD_DIR"] stringByAppendingPathComponent:[env objectForKey:@"UNLOCALIZED_RESOURCES_FOLDER_PATH"]];
-            sourcePath = [env objectForKey:@"SRCROOT"];
-            devLanguageLproj = [[env objectForKey:@"DEVELOPMENT_LANGUAGE"] stringByAppendingPathExtension:@"lproj"];
+        if (env[@"TARGET_BUILD_DIR"]) {
+            resourcesPath = [env[@"TARGET_BUILD_DIR"] stringByAppendingPathComponent:[env objectForKey:@"UNLOCALIZED_RESOURCES_FOLDER_PATH"]];
+            sourcePath = env[@"SRCROOT"];
+            devLanguageLproj = [env[@"DEVELOPMENT_LANGUAGE"] stringByAppendingPathExtension:@"lproj"];
         } else {
             resourcesPath = [@"~/Library/Developer/Xcode/DerivedData/UberLibrary-djzgxxrdrlqezxgaansiwhdraxmn/Build/Products/Debug/Delicious Library 3.app/Contents/Resources" stringByExpandingTildeInPath];
             sourcePath = [@"~/Documents/Streams/Delicious Monster/UberLibrary/Library" stringByExpandingTildeInPath];
@@ -198,9 +198,9 @@ int main(int argc, const char *argv[])
             NSString *devStringsContents = [NSString stringWithContentsOfFile:devStringsPath usedEncoding:NULL error:NULL];
             
             for (NSString *lproj in targetLanguageLprojs) {
-                DMLocalizationMapping *mapping = [translationTables objectForKey:lproj];
-                NSMutableSet *unusedLocalizationKeys = [unusedLocalizations objectForKey:lproj];
-                NSUInteger unlocalizedStringRoughCount = [[unlocalizedStringRoughCountByLanguage objectForKey:lproj] unsignedIntegerValue];
+                DMLocalizationMapping *mapping = translationTables[lproj];
+                NSMutableSet *unusedLocalizationKeys = unusedLocalizations[lproj];
+                NSUInteger unlocalizedStringRoughCount = [unlocalizedStringRoughCountByLanguage[lproj] unsignedIntegerValue];
                 
                 NSMutableString *localizedTranscription = [NSMutableString string];
                 NSMutableString *savedTranscriptionForDoNotLocalize = localizedTranscription;
@@ -281,7 +281,7 @@ int main(int argc, const char *argv[])
                 if ([localizedTranscription characterAtIndex:(localizedTranscription.length - 1)] != '\n')
                     [localizedTranscription appendString:@"\n"];
                 
-                [unlocalizedStringRoughCountByLanguage setObject:[NSNumber numberWithUnsignedInteger:unlocalizedStringRoughCount] forKey:lproj];
+                [unlocalizedStringRoughCountByLanguage setObject:@(unlocalizedStringRoughCount) forKey:lproj];
                 NSString *localizedStringsPath = [[sourcePath stringByAppendingPathComponent:lproj] stringByAppendingPathComponent:devStringsComponent];
                 __autoreleasing NSError *writeError = nil;
                 if (![localizedTranscription writeToFile:localizedStringsPath atomically:YES encoding:NSUTF8StringEncoding error:&writeError])
@@ -307,10 +307,10 @@ int main(int argc, const char *argv[])
          * Write orphaned translations
          */
         for (NSString *lproj in targetLanguageLprojs) {
-            DMLocalizationMapping *mapping = [translationTables objectForKey:lproj];
+            DMLocalizationMapping *mapping = translationTables[lproj];
             NSMutableString *unusedLocalizedStrings = [NSMutableString stringWithFormat:@"/* Orphaned localized strings for %@ */", lproj];
             NSUInteger orphanedStringCount = 0;
-            for (DMFormatString *unusedDevFormatString in [unusedLocalizations objectForKey:lproj]) {
+            for (DMFormatString *unusedDevFormatString in unusedLocalizations[lproj]) {
                 DMFormatString *localizedFormatString = [mapping bestLocalizedFormatStringForDevString:unusedDevFormatString forContext:nil matchLevel:NULL];
                 if (![unusedDevFormatString isEqual:localizedFormatString]) { // Final check: Don't write strings that are the same
                     orphanedStringCount++;
@@ -333,7 +333,7 @@ int main(int argc, const char *argv[])
         fputs("\n---- Approximate statistics ----\n", stdout);
         const NSUInteger barWidth = 40;
         for (NSString *lproj in targetLanguageLprojs) {
-            NSUInteger roughUnlocalizedCount = [[unlocalizedStringRoughCountByLanguage objectForKey:lproj] unsignedIntegerValue];
+            NSUInteger roughUnlocalizedCount = [unlocalizedStringRoughCountByLanguage[lproj] unsignedIntegerValue];
             float localizedProportion = 1.0 - ((float)roughUnlocalizedCount / (float)devStringSet.count);
             NSUInteger barCharCount = MAX(MIN(localizedProportion, 1.0), 0.0) * barWidth;
 
@@ -554,15 +554,15 @@ static BOOL isBetterLocalization(DMFormatString *newLocalizedString, DMFormatStr
 
 - (void)addLocalization:(DMFormatString *)localizedFormatString forDevString:(DMFormatString *)devFormatString context:(NSString *)tableNameOrNil;
 {
-    if (isBetterLocalization(localizedFormatString, [_allMappings objectForKey:devFormatString], devFormatString))
+    if (isBetterLocalization(localizedFormatString, _allMappings[devFormatString], devFormatString))
         [_allMappings setObject:localizedFormatString forKey:devFormatString];
     
     if (!tableNameOrNil)
         return;
-    NSMutableDictionary *table = [_mappingsByTableName objectForKey:tableNameOrNil];
+    NSMutableDictionary *table = _mappingsByTableName[tableNameOrNil];
     if (!table)
         [_mappingsByTableName setObject:(table = [NSMutableDictionary dictionary]) forKey:tableNameOrNil];
-    if (isBetterLocalization(localizedFormatString, [table objectForKey:devFormatString], devFormatString))
+    if (isBetterLocalization(localizedFormatString, table[devFormatString], devFormatString))
         [table setObject:localizedFormatString forKey:devFormatString];
 }
 
@@ -572,13 +572,13 @@ static BOOL isBetterLocalization(DMFormatString *newLocalizedString, DMFormatStr
         return nil;
     DMFormatString *localizedFormatString = nil;
     if (tableNameOrNil) {
-        localizedFormatString = [[_mappingsByTableName objectForKey:tableNameOrNil] objectForKey:devFormatString];
+        localizedFormatString = [_mappingsByTableName[tableNameOrNil] objectForKey:devFormatString];
         if (outMatchLevel) *outMatchLevel = DMMatchSameContext;
         if (localizedFormatString)
             return localizedFormatString;
     }
     
-    localizedFormatString = [_allMappings objectForKey:devFormatString];
+    localizedFormatString = _allMappings[devFormatString];
     if (outMatchLevel) *outMatchLevel = DMMatchDifferentContext;
     if (localizedFormatString)
         return localizedFormatString;
@@ -701,7 +701,7 @@ typedef enum {
         if ([obj isKindOfClass:[NSString class]])
             [matchedComponents addObject:obj];
         else if ([obj isKindOfClass:[DMFormatSpecifier class]]) {
-            DMFormatSpecifier *targetSpecifier = [targetFormatString.formatSpecifiersByPosition objectForKey:[obj valueForKey:@"position"]];
+            DMFormatSpecifier *targetSpecifier = targetFormatString.formatSpecifiersByPosition[[obj valueForKey:@"position"]];
             DMFormatSpecifier *chosenSpecifier = obj;
             if ([obj isEqual:targetSpecifier])
                 chosenSpecifier = targetSpecifier;
