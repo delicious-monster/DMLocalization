@@ -66,7 +66,7 @@ int main(int argc, const char *argv[])
         // Set paths
         NSString *resourcesPath, *sourcePath, *devLanguageLproj;
         if (env[@"TARGET_BUILD_DIR"]) {
-            resourcesPath = [env[@"TARGET_BUILD_DIR"] stringByAppendingPathComponent:[env objectForKey:@"UNLOCALIZED_RESOURCES_FOLDER_PATH"]];
+            resourcesPath = [env[@"TARGET_BUILD_DIR"] stringByAppendingPathComponent:env[@"UNLOCALIZED_RESOURCES_FOLDER_PATH"]];
             sourcePath = env[@"SRCROOT"];
             devLanguageLproj = [env[@"DEVELOPMENT_LANGUAGE"] stringByAppendingPathExtension:@"lproj"];
         } else {
@@ -110,9 +110,9 @@ int main(int argc, const char *argv[])
         
         for (NSString *lproj in targetLanguageLprojs) {
             DMLocalizationMapping *mapping = [[DMLocalizationMapping alloc] initWithName:lproj];
-            [translationTables setObject:mapping forKey:lproj];
+            translationTables[lproj] = mapping;
             NSMutableSet *localizationKeys = [NSMutableSet set];
-            [unusedLocalizations setObject:localizationKeys forKey:lproj];
+            unusedLocalizations[lproj] = localizationKeys;
             
             NSString *langaugeProjPath = [sourcePath stringByAppendingPathComponent:lproj];
             for (NSString *languageSubfile in [fm contentsOfDirectoryAtPath:langaugeProjPath error:NULL]) {
@@ -281,7 +281,7 @@ int main(int argc, const char *argv[])
                 if ([localizedTranscription characterAtIndex:(localizedTranscription.length - 1)] != '\n')
                     [localizedTranscription appendString:@"\n"];
                 
-                [unlocalizedStringRoughCountByLanguage setObject:@(unlocalizedStringRoughCount) forKey:lproj];
+                unlocalizedStringRoughCountByLanguage[lproj] = @(unlocalizedStringRoughCount);
                 NSString *localizedStringsPath = [[sourcePath stringByAppendingPathComponent:lproj] stringByAppendingPathComponent:devStringsComponent];
                 __autoreleasing NSError *writeError = nil;
                 if (![localizedTranscription writeToFile:localizedStringsPath atomically:YES encoding:NSUTF8StringEncoding error:&writeError])
@@ -555,15 +555,15 @@ static BOOL isBetterLocalization(DMFormatString *newLocalizedString, DMFormatStr
 - (void)addLocalization:(DMFormatString *)localizedFormatString forDevString:(DMFormatString *)devFormatString context:(NSString *)tableNameOrNil;
 {
     if (isBetterLocalization(localizedFormatString, _allMappings[devFormatString], devFormatString))
-        [_allMappings setObject:localizedFormatString forKey:devFormatString];
+        _allMappings[devFormatString] = localizedFormatString;
     
     if (!tableNameOrNil)
         return;
     NSMutableDictionary *table = _mappingsByTableName[tableNameOrNil];
     if (!table)
-        [_mappingsByTableName setObject:(table = [NSMutableDictionary dictionary]) forKey:tableNameOrNil];
+        _mappingsByTableName[tableNameOrNil] = (table = [NSMutableDictionary dictionary]);
     if (isBetterLocalization(localizedFormatString, table[devFormatString], devFormatString))
-        [table setObject:localizedFormatString forKey:devFormatString];
+        table[devFormatString] = localizedFormatString;
 }
 
 - (DMFormatString *)bestLocalizedFormatStringForDevString:(DMFormatString *)devFormatString forContext:(NSString *)tableNameOrNil matchLevel:(out DMMatchLevel *)outMatchLevel;
@@ -572,7 +572,7 @@ static BOOL isBetterLocalization(DMFormatString *newLocalizedString, DMFormatStr
         return nil;
     DMFormatString *localizedFormatString = nil;
     if (tableNameOrNil) {
-        localizedFormatString = [_mappingsByTableName[tableNameOrNil] objectForKey:devFormatString];
+        localizedFormatString = (_mappingsByTableName[tableNameOrNil])[devFormatString];
         if (outMatchLevel) *outMatchLevel = DMMatchSameContext;
         if (localizedFormatString)
             return localizedFormatString;
@@ -718,7 +718,7 @@ typedef enum {
         NSMutableDictionary *specifierMap = [NSMutableDictionary dictionary];
         for (id component in self.components)
             if ([component isKindOfClass:[DMFormatSpecifier class]])
-                [specifierMap setObject:component forKey:[component valueForKey:@"position"]];
+                specifierMap[[component valueForKey:@"position"]] = component;
         _formatSpecifiersByPosition = [specifierMap copy];
     }
     return _formatSpecifiersByPosition;
