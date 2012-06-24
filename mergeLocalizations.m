@@ -539,7 +539,7 @@ typedef enum {
 }
 
 - (NSUInteger)count;
-{ return [_allMappings count]; }
+{ return _allMappings.count; }
 
 static BOOL isBetterLocalization(DMFormatString *newLocalizedString, DMFormatString *previousString, DMFormatString *devFormatString)
 {
