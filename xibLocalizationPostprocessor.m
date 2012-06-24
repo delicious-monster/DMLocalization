@@ -17,7 +17,7 @@ int main(int argc, const char *argv[])
 
         NSError *error = nil;
         NSStringEncoding usedEncoding;
-        NSString *rawXIBStrings = [NSString stringWithContentsOfFile:[NSString stringWithUTF8String:argv[1]] usedEncoding:&usedEncoding error:&error];
+        NSString *rawXIBStrings = [NSString stringWithContentsOfFile:@(argv[1]) usedEncoding:&usedEncoding error:&error];
         if (!rawXIBStrings) {
             fprintf(stderr, "Error reading %s: %s\n", argv[1], error.localizedDescription.UTF8String);
             exit (-1);
@@ -55,7 +55,7 @@ int main(int argc, const char *argv[])
             NSLog(@"Warning: skipped garbage input line %ld, contents: \"%@\"", (long)lineCount, line);
         }
         
-        if (outputStrings.length && ![outputStrings writeToFile:[NSString stringWithUTF8String:argv[2]] atomically:NO encoding:NSUTF8StringEncoding error:&error]) {
+        if (outputStrings.length && ![outputStrings writeToFile:@(argv[2]) atomically:NO encoding:NSUTF8StringEncoding error:&error]) {
             fprintf(stderr, "Error writing %s: %s\n", argv[2], error.localizedDescription.UTF8String);
             exit (-1);
         }
