@@ -794,12 +794,12 @@ typedef enum {
     
     if (!(self = [super init]))
         return nil;
-    if ([potentialSpecifierString length] < 2)
+    if (potentialSpecifierString.length < 2)
         return nil;
     if ([potentialSpecifierString isEqual:@"%%"])
         return nil; // %% is a literal percent, not a specifier
     
-    NSRange fullRange = NSMakeRange(0, [potentialSpecifierString length]);
+    NSRange fullRange = NSMakeRange(0, potentialSpecifierString.length);
     NSTextCheckingResult *formatStringMatch = nil, *displayPatternMatch = nil, *ruleEditorMatch = nil;
     formatStringMatch = [formatStringSpecifierRegExp firstMatchInString:potentialSpecifierString options:NSMatchingAnchored range:fullRange];
     if (formatStringMatch) {
