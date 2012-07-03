@@ -334,8 +334,8 @@ int main(int argc, const char *argv[])
         const NSUInteger barWidth = 40;
         for (NSString *lproj in targetLanguageLprojs) {
             NSUInteger roughUnlocalizedCount = [unlocalizedStringRoughCountByLanguage[lproj] unsignedIntegerValue];
-            float localizedProportion = 1.0 - ((float)roughUnlocalizedCount / (float)devStringSet.count);
-            NSUInteger barCharCount = MAX(MIN(localizedProportion, 1.0), 0.0) * barWidth;
+            float localizedProportion = 1.0f - ((float)roughUnlocalizedCount / (float)devStringSet.count);
+            NSUInteger barCharCount = (NSUInteger)roundf(MAX(MIN(localizedProportion, 1.0f), 0.0f)) * barWidth;
 
             NSString *paddedLproj = [lproj stringByPaddingToLength:15 withString:@" " startingAtIndex:0];
             NSString *bar = [[@"" stringByPaddingToLength:barCharCount withString:@"=" startingAtIndex:0] stringByPaddingToLength:barWidth withString:@" " startingAtIndex:0];
