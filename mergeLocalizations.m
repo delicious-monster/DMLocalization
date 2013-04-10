@@ -52,7 +52,7 @@ typedef enum {
 
 //#define SET_NEEDS_LOCALIZATION_IF_SAME_AS_DEV_STRING
 static NSString *const DMOrphanedStringsFilename = @"_orphaned.strings";
-static NSString *const DMDoNotLocalizeMarker = @"????";
+static NSString *const DMDoNotLocalizeMarker = @"??";
 static NSString *const DMNeedsLocalizationMarker = @" /*!!! Needs translation, delete this comment when translated !!!*/";
 static NSString *const DMLocalizationOutOfContextMarker = @" /*!!! Translation found in different context, delete this comment if ok !!!*/";
 
