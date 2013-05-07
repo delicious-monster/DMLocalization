@@ -310,7 +310,7 @@ int main(int argc, const char *argv[])
             DMLocalizationMapping *mapping = translationTables[lproj];
             NSMutableString *unusedLocalizedStrings = [NSMutableString stringWithFormat:@"/* Orphaned localized strings for %@ */", lproj];
             NSUInteger orphanedStringCount = 0;
-            for (DMFormatString *unusedDevFormatString in unusedLocalizations[lproj]) {
+            for (DMFormatString *unusedDevFormatString in [unusedLocalizations[lproj] sortedArrayUsingDescriptors:@[[NSSortDescriptor sortDescriptorWithKey:@"description" ascending:YES]]]) {
                 DMFormatString *localizedFormatString = [mapping bestLocalizedFormatStringForDevString:unusedDevFormatString forContext:nil matchLevel:NULL];
                 if (![unusedDevFormatString isEqual:localizedFormatString]) { // Final check: Don't write strings that are the same
                     orphanedStringCount++;
