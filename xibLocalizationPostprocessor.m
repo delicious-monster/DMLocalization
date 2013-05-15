@@ -6,24 +6,25 @@
 
 #import <Cocoa/Cocoa.h>
 
+static NSString *const DMDoNotLocalizeMarker = @"??";
 
 int main(int argc, const char *argv[])
 {
     @autoreleasepool {
-        if (argc != 3) {
-            fprintf(stderr, "Usage: %s inputfile outputfile\n", argv[0]);
+        if (argc != 2) {
+            fprintf(stderr, "Usage: %s file.strings\n", argv[0]);
             exit (-1);   
         }
 
         NSError *error = nil;
         NSStringEncoding usedEncoding;
-        NSString *rawXIBStrings = [NSString stringWithContentsOfFile:@(argv[1]) usedEncoding:&usedEncoding error:&error];
+        NSString *const rawXIBStrings = [NSString stringWithContentsOfFile:@(argv[1]) usedEncoding:&usedEncoding error:&error];
         if (!rawXIBStrings) {
             fprintf(stderr, "Error reading %s: %s\n", argv[1], error.localizedDescription.UTF8String);
             exit (-1);
         }
                                    
-        NSMutableString *outputStrings = [NSMutableString string];
+        NSMutableString *const outputStrings = [NSMutableString new];
         NSUInteger lineCount = 0;
         NSString *lastComment = nil;
         for (NSString *line in [rawXIBStrings componentsSeparatedByString:@"\n"]) {
@@ -39,15 +40,20 @@ int main(int argc, const char *argv[])
 
             } else if ([line hasPrefix:@"\""] && [line hasSuffix:@"\";"]) { // eg: "136.title" = "Quit Library";
                 
-                NSRange quoteEqualsQuoteRange = [line rangeOfString:@"\" = \""];
+                const NSRange quoteEqualsQuoteRange = [line rangeOfString:@"\" = \""];
                 if (quoteEqualsQuoteRange.length && NSMaxRange(quoteEqualsQuoteRange) < line.length - 1) {
+                    NSString *stringNeedingLocalization = [line substringFromIndex:NSMaxRange(quoteEqualsQuoteRange)]; // chop off leading: "136.title" = "
+                    stringNeedingLocalization = [stringNeedingLocalization substringToIndex:stringNeedingLocalization.length - 2]; // chop off trailing: ";
+                    if ([stringNeedingLocalization rangeOfString:DMDoNotLocalizeMarker].length)
+                        continue;
+
                     if (lastComment) {
+                        [outputStrings appendString:@"\n"];
                         [outputStrings appendString:lastComment];
                         [outputStrings appendString:@"\n"];
                     }
-                    NSString *stringNeedingLocalization = [line substringFromIndex:NSMaxRange(quoteEqualsQuoteRange)]; // chop off leading: "blah" = "
-                    stringNeedingLocalization = [stringNeedingLocalization substringToIndex:stringNeedingLocalization.length - 2]; // chop off trailing: ";
-                    [outputStrings appendFormat:@"\"%@\" = \"%@\";\n\n", stringNeedingLocalization, stringNeedingLocalization];
+                    [outputStrings appendString:line];
+                    [outputStrings appendString:@"\n"];
                     continue;
                 }
             }
@@ -55,8 +61,8 @@ int main(int argc, const char *argv[])
             NSLog(@"Warning: skipped garbage input line %ld, contents: \"%@\"", (long)lineCount, line);
         }
         
-        if (outputStrings.length && ![outputStrings writeToFile:@(argv[2]) atomically:NO encoding:NSUTF8StringEncoding error:&error]) {
-            fprintf(stderr, "Error writing %s: %s\n", argv[2], error.localizedDescription.UTF8String);
+        if (outputStrings.length && ![outputStrings writeToFile:@(argv[1]) atomically:NO encoding:NSUTF8StringEncoding error:&error]) {
+            fprintf(stderr, "Error writing %s: %s\n", argv[1], error.localizedDescription.UTF8String);
             exit (-1);
         }
     }
