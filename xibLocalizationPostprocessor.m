@@ -6,8 +6,6 @@
 
 #import <Cocoa/Cocoa.h>
 
-static NSString *const DMDoNotLocalizeMarker = @"??";
-
 int main(int argc, const char *argv[])
 {
     @autoreleasepool {
@@ -23,7 +21,36 @@ int main(int argc, const char *argv[])
             fprintf(stderr, "Error reading %s: %s\n", argv[1], error.localizedDescription.UTF8String);
             exit (-1);
         }
-                                   
+
+        NSString *const doNotLocalizeMarker = @"??";
+        NSArray *const commentPrefixesForStringsThatReallyDoNotNeedToBeLocalized = @[
+                                                                                     // Skip examples:
+                                                                                     /* Class = "NSTextFieldCell"; title = "Text Cell"; ObjectID = "532"; */
+                                                                                     @"/* Class = \"NSTextFieldCell\"; title = \"Text Cell\";",
+                                                                                     /* Class = "NSBox"; title = "Box"; ObjectID = "1162"; */
+                                                                                     @"/* Class = \"NSBox\"; title = \"Box\";",
+                                                                                     /* Class = "NSButtonCell"; title = "Radio"; ObjectID = "472"; */
+                                                                                     @"/* Class = \"NSButtonCell\"; title = \"Radio\";",
+                                                                                     /* Class = "NSMenu"; title = "ANYTHING"; ObjectID = "15"; */
+                                                                                     @"/* Class = \"NSMenu\"; title = \"",
+                                                                                     /* Class = "NSWindow"; title = "Window"; ObjectID = "80"; */
+                                                                                     @"/* Class = \"NSWindow\"; title = \"Window\";",
+                                                                                     /* Class = "NSViewController"; title = "ANYTHING"; ObjectID = "1090"; */
+                                                                                     @"/* Class = \"NSViewController\"; title = \"",
+                                                                                     // older style (starts with "Item1")
+                                                                                     /* Class = "NSMenuItem"; title = "Item1"; ObjectID = "87"; */
+                                                                                     @"/* Class = \"NSMenuItem\"; title = \"Item1\";",
+                                                                                     /* Class = "NSMenuItem"; title = "Item2"; ObjectID = "197"; */
+                                                                                     @"/* Class = \"NSMenuItem\"; title = \"Item2\";",
+                                                                                     /* Class = "NSMenuItem"; title = "Item3"; ObjectID = "324"; */
+                                                                                     @"/* Class = \"NSMenuItem\"; title = \"Item3\";",
+                                                                                     // newer style (starts with "Item", which might be valid, so skip it)
+                                                                                     /* Class = "NSMenuItem"; title = "Item 2"; ObjectID = "197"; */
+                                                                                     @"/* Class = \"NSMenuItem\"; title = \"Item 2\";",
+                                                                                     /* Class = "NSMenuItem"; title = "Item 3"; ObjectID = "324"; */
+                                                                                     @"/* Class = \"NSMenuItem\"; title = \"Item 3\";",
+                                                                                     ];
+
         NSMutableString *const outputStrings = [NSMutableString new];
         NSUInteger lineCount = 0;
         NSString *lastComment = nil;
@@ -32,38 +59,47 @@ int main(int argc, const char *argv[])
             
             if ([line hasPrefix:@"/*"]) { // eg: /* Class = "NSMenuItem"; title = "Quit Library"; ObjectID = "136"; */
                 lastComment = line;
-                continue;
 
             } else if (line.length == 0) {
                 lastComment = nil;
-                continue;
 
             } else if ([line hasPrefix:@"\""] && [line hasSuffix:@"\";"]) { // eg: "136.title" = "Quit Library";
-                
-                const NSRange quoteEqualsQuoteRange = [line rangeOfString:@"\" = \""];
-                if (quoteEqualsQuoteRange.length && NSMaxRange(quoteEqualsQuoteRange) < line.length - 1) {
-                    NSString *stringNeedingLocalization = [line substringFromIndex:NSMaxRange(quoteEqualsQuoteRange)]; // chop off leading: "136.title" = "
-                    stringNeedingLocalization = [stringNeedingLocalization substringToIndex:stringNeedingLocalization.length - 2]; // chop off trailing: ";
-                    if ([stringNeedingLocalization rangeOfString:DMDoNotLocalizeMarker].length)
-                        continue;
 
-                    if (lastComment) {
-                        [outputStrings appendString:@"\n"];
-                        [outputStrings appendString:lastComment];
-                        [outputStrings appendString:@"\n"];
-                    }
-                    [outputStrings appendString:line];
-                    [outputStrings appendString:@"\n"];
+                // see if this contains our marker ("??") for placeholder strings that shouldn't be localized
+                if ([line rangeOfString:doNotLocalizeMarker].length) {
+                    printf("Info: skipped input line %ld, ‘??’ found: “%s”\n", (long)lineCount, line.UTF8String);
                     continue;
                 }
-            }
-            
-            NSLog(@"Warning: skipped garbage input line %ld, contents: \"%@\"", (long)lineCount, line);
+                // see if this is one of the common garbage strings IB inserts in XIBs, so we don't force our
+                BOOL skipLine = NO;
+                for (NSString *skipCommentPrefix in commentPrefixesForStringsThatReallyDoNotNeedToBeLocalized)
+                    if ([lastComment hasPrefix:skipCommentPrefix]) {
+                        skipLine = YES;
+                        break;
+                    }
+                if (skipLine) {
+                    printf("Info: skipped input line %ld, comment matched blacklist: “%s”\n", (long)lineCount, lastComment.UTF8String);
+                    continue;
+                }
+
+                [outputStrings appendString:@"\n"];
+                if (lastComment) {
+                    [outputStrings appendString:lastComment]; [outputStrings appendString:@"\n"];
+                }
+                [outputStrings appendString:line]; [outputStrings appendString:@"\n"];
+
+            } else
+                printf("Warning: skipped garbage input line %ld, contents: “%s”\n", (long)lineCount, line.UTF8String);
         }
         
-        if (outputStrings.length && ![outputStrings writeToFile:@(argv[1]) atomically:NO encoding:NSUTF8StringEncoding error:&error]) {
-            fprintf(stderr, "Error writing %s: %s\n", argv[1], error.localizedDescription.UTF8String);
-            exit (-1);
-        }
+        if (outputStrings.length) {
+            if (![outputStrings writeToFile:@(argv[1]) atomically:NO encoding:NSUTF8StringEncoding error:&error]) {
+                fprintf(stderr, "Error writing %s: %s\n", argv[1], error.localizedDescription.UTF8String);
+                exit (-1);
+            }
+
+        } else // remove strings file if it's now totally empty!
+            [[NSFileManager defaultManager] removeItemAtPath:[[NSFileManager defaultManager] stringWithFileSystemRepresentation:argv[1] length:strlen(argv[1])] error:NULL];
+
     }
 }
