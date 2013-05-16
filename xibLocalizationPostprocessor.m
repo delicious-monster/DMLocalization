@@ -35,8 +35,6 @@ int main(int argc, const char *argv[])
                                                                                      @"/* Class = \"NSMenu\"; title = \"",
                                                                                      /* Class = "NSWindow"; title = "Window"; ObjectID = "80"; */
                                                                                      @"/* Class = \"NSWindow\"; title = \"Window\";",
-                                                                                     /* Class = "NSViewController"; title = "ANYTHING"; ObjectID = "1090"; */
-                                                                                     @"/* Class = \"NSViewController\"; title = \"",
                                                                                      // older style (starts with "Item1")
                                                                                      /* Class = "NSMenuItem"; title = "Item1"; ObjectID = "87"; */
                                                                                      @"/* Class = \"NSMenuItem\"; title = \"Item1\";",
