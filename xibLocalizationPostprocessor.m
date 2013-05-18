@@ -14,6 +14,8 @@ int main(int argc, const char *argv[])
             exit (-1);   
         }
 
+        NSString *const filename = ((NSString *)[NSString stringWithUTF8String:argv[1]]).lastPathComponent;
+
         NSError *error = nil;
         NSStringEncoding usedEncoding;
         NSString *const rawXIBStrings = [NSString stringWithContentsOfFile:@(argv[1]) usedEncoding:&usedEncoding error:&error];
@@ -65,7 +67,7 @@ int main(int argc, const char *argv[])
 
                 // see if this contains our marker ("??") for placeholder strings that shouldn't be localized
                 if ([line rangeOfString:doNotLocalizeMarker].length) {
-                    printf("Info: skipped input line %ld, ‘??’ found: “%s”\n", (long)lineCount, line.UTF8String);
+                    printf("Info: skipped %s line %ld, ‘??’ found: “%s”\n", filename.UTF8String, (long)lineCount, line.UTF8String);
                     continue;
                 }
                 // see if this is one of the common garbage strings IB inserts in XIBs, so we don't force our
@@ -76,7 +78,7 @@ int main(int argc, const char *argv[])
                         break;
                     }
                 if (skipLine) {
-                    printf("Info: skipped input line %ld, comment matched blacklist: “%s”\n", (long)lineCount, lastComment.UTF8String);
+                    printf("Info: skipped %s line %ld, comment matched blacklist: “%s”\n", filename.UTF8String, (long)lineCount, lastComment.UTF8String);
                     continue;
                 }
 
@@ -87,7 +89,7 @@ int main(int argc, const char *argv[])
                 [outputStrings appendString:line]; [outputStrings appendString:@"\n"];
 
             } else
-                printf("Warning: skipped garbage input line %ld, contents: “%s”\n", (long)lineCount, line.UTF8String);
+                printf("Warning: skipped %s garbage line %ld, contents: “%s”\n", filename.UTF8String, (long)lineCount, line.UTF8String);
         }
         
         if (outputStrings.length) {
@@ -97,7 +99,9 @@ int main(int argc, const char *argv[])
             }
 
         } else // remove strings file if it's now totally empty!
-            [[NSFileManager defaultManager] removeItemAtPath:[[NSFileManager defaultManager] stringWithFileSystemRepresentation:argv[1] length:strlen(argv[1])] error:NULL];
-
+            if (![[NSFileManager defaultManager] removeItemAtPath:[[NSFileManager defaultManager] stringWithFileSystemRepresentation:argv[1] length:strlen(argv[1])] error:&error]) {
+                fprintf(stderr, "Error deleting %s: %s\n", argv[1], error.localizedDescription.UTF8String);
+                exit (-1);
+            }
     }
 }
