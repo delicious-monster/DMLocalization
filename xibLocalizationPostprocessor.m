@@ -6,22 +6,25 @@
 
 #import <Cocoa/Cocoa.h>
 
+#define LOG_INFO 1
+
+
 int main(int argc, const char *argv[])
 {
+    if (argc != 2) {
+        fprintf(stderr, "Usage: %s file.strings\n", argv[0]);
+        return -1;
+    }
+
     @autoreleasepool {
-        if (argc != 2) {
-            fprintf(stderr, "Usage: %s file.strings\n", argv[0]);
-            exit (-1);   
-        }
+        NSString *const filePath = @(argv[1]);
+        NSString *const filename = filePath.lastPathComponent;
 
-        NSString *const filename = ((NSString *)[NSString stringWithUTF8String:argv[1]]).lastPathComponent;
-
-        NSError *error = nil;
-        NSStringEncoding usedEncoding;
-        NSString *const rawXIBStrings = [NSString stringWithContentsOfFile:@(argv[1]) usedEncoding:&usedEncoding error:&error];
+        __autoreleasing NSError *error = nil;
+        NSString *const rawXIBStrings = [NSString stringWithContentsOfFile:filePath usedEncoding:NULL error:&error];
         if (!rawXIBStrings) {
-            fprintf(stderr, "Error reading %s: %s\n", argv[1], error.localizedDescription.UTF8String);
-            exit (-1);
+            fprintf(stderr, "%s error: %s\n", filePath.UTF8String, error.localizedDescription.UTF8String);
+            return -1;
         }
 
         NSString *const doNotLocalizeMarker = @"??";
@@ -52,9 +55,9 @@ int main(int argc, const char *argv[])
                                                                                      ];
 
         NSMutableString *const outputStrings = [NSMutableString new];
-        NSUInteger lineCount = 0;
-        NSString *lastComment = nil;
-        for (NSString *line in [rawXIBStrings componentsSeparatedByString:@"\n"]) {
+        __block NSUInteger lineCount = 0;
+        __block NSString *lastComment = nil;
+        [rawXIBStrings enumerateLinesUsingBlock:^(NSString *line, BOOL *stop) {
             lineCount++;
             
             if ([line hasPrefix:@"/*"]) { // eg: /* Class = "NSMenuItem"; title = "Quit Library"; ObjectID = "136"; */
@@ -67,8 +70,10 @@ int main(int argc, const char *argv[])
 
                 // see if this contains our marker ("??") for placeholder strings that shouldn't be localized
                 if ([line rangeOfString:doNotLocalizeMarker].length) {
-                    printf("Info: skipped %s line %ld, ‘??’ found: “%s”\n", filename.UTF8String, (long)lineCount, line.UTF8String);
-                    continue;
+#if LOG_INFO
+                    printf("%s:%lu info: skipped line, ‘??’ found: “%s”\n", filename.UTF8String, (unsigned long)lineCount, line.UTF8String);
+#endif
+                    return;
                 }
                 // see if this is one of the common garbage strings IB inserts in XIBs, so we don't force our
                 BOOL skipLine = NO;
@@ -78,8 +83,10 @@ int main(int argc, const char *argv[])
                         break;
                     }
                 if (skipLine) {
-                    printf("Info: skipped %s line %ld, comment matched blacklist: “%s”\n", filename.UTF8String, (long)lineCount, lastComment.UTF8String);
-                    continue;
+#if LOG_INFO
+                    printf("%s:%lu info: skipped line, comment matched blacklist: “%s”\n", filename.UTF8String, (unsigned long)lineCount, lastComment.UTF8String);
+#endif
+                    return;
                 }
 
                 [outputStrings appendString:@"\n"];
@@ -89,19 +96,21 @@ int main(int argc, const char *argv[])
                 [outputStrings appendString:line]; [outputStrings appendString:@"\n"];
 
             } else
-                printf("Warning: skipped %s garbage line %ld, contents: “%s”\n", filename.UTF8String, (long)lineCount, line.UTF8String);
-        }
+                printf("%s:%lu warning: skipped garbage line, contents: “%s”\n", filename.UTF8String, (unsigned long)lineCount, line.UTF8String);
+        }];
         
         if (outputStrings.length) {
-            if (![outputStrings writeToFile:@(argv[1]) atomically:NO encoding:NSUTF8StringEncoding error:&error]) {
-                fprintf(stderr, "Error writing %s: %s\n", argv[1], error.localizedDescription.UTF8String);
-                exit (-1);
+            if (![outputStrings writeToFile:filePath atomically:YES encoding:NSUTF8StringEncoding error:&error]) {
+                fprintf(stderr, "%s: Error writing: %s\n", filePath.UTF8String, error.localizedDescription.UTF8String);
+                return -1;
             }
 
-        } else // remove strings file if it's now totally empty!
-            if (![[NSFileManager defaultManager] removeItemAtPath:[[NSFileManager defaultManager] stringWithFileSystemRepresentation:argv[1] length:strlen(argv[1])] error:&error]) {
-                fprintf(stderr, "Error deleting %s: %s\n", argv[1], error.localizedDescription.UTF8String);
-                exit (-1);
+        } else { // remove strings file if it's now totally empty!
+            if (![[NSFileManager defaultManager] removeItemAtPath:filePath error:&error]) {
+                fprintf(stderr, "%s: Error deleting: %s\n", filePath.UTF8String, error.localizedDescription.UTF8String);
+                return-1;
             }
+        }
+        return 0;
     }
 }
