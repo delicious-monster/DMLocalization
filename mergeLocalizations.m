@@ -16,7 +16,6 @@
 
 //#define SET_NEEDS_LOCALIZATION_IF_SAME_AS_DEV_STRING
 static NSString *const DMOrphanedStringsFilename = @"_unused do not localize.strings";
-static NSString *const DMDoNotLocalizeMarker = @"??";
 static NSString *const DMNeedsLocalizationMarker = @" /*!!! Needs translation, delete this comment when translated !!!*/";
 static NSString *const DMLocalizationOutOfContextMarker = @" /*!!! Translation found in different context, delete this comment if ok !!!*/";
 static NSString *const templateLanguageLproj = @"Example.lproj", *const devLanguageLproj = @"en.lproj", *const baseLanguageLproj = @"Base.lproj";
@@ -41,8 +40,10 @@ int main(int argc, const char *argv[])
             exit(EXIT_FAILURE);
         }
         
-        
+        //
+        // STEP 1:
         // Build index of strings files in the development language, and the target translation languages
+        //
         NSMutableSet *const devLanguageStringsFiles = [NSMutableSet set]; {
             for (NSString *languageSubfile in [fileManager contentsOfDirectoryAtPath:[resourcesPath stringByAppendingPathComponent:templateLanguageLproj] error:NULL])
                 if ([languageSubfile.pathExtension isEqualToString:@"strings"])
@@ -60,23 +61,25 @@ int main(int argc, const char *argv[])
                 if ([sourcePathComponent.pathExtension isEqualToString:@"lproj"] && ![sourcePathComponent isEqualToString:devLanguageLproj] && ![sourcePathComponent isEqualToString:baseLanguageLproj] && ![sourcePathComponent isEqualToString:templateLanguageLproj])
                     [targetLanguageLprojs addObject:sourcePathComponent];
         }
-        
-        /*
-         * First, for each language, build a DMLocalizationMapping of each key-value pair,
-         * also storing the name of the strings file in which each pair was found.
-         */
+
+
+        //
+        // STEP 2:
+        // First, for each language, build a DMLocalizationMapping of each key-value pair, also storing the name of the strings file in which each pair was found.
+        //
         fputs([@"Building translation tables\n" UTF8String], stdout);
         BOOL hadParseError = NO;
         NSMutableDictionary *const translationTables = [NSMutableDictionary new]; // lang.lproj to DMLocalizationMapping
         NSMutableDictionary *const unusedLocalizations = [NSMutableDictionary new]; // lang.lproj to NSMutableSet of DMFormatString
-        
+
         for (NSString *lproj in targetLanguageLprojs) {
-            DMLocalizationMapping *mapping = [[DMLocalizationMapping alloc] initWithName:lproj];
+            DMLocalizationMapping *const mapping = [[DMLocalizationMapping alloc] initWithName:lproj];
             translationTables[lproj] = mapping;
-            NSMutableSet *localizationKeys = [NSMutableSet set];
+            
+            NSMutableSet *const localizationKeys = [NSMutableSet set];
             unusedLocalizations[lproj] = localizationKeys;
             
-            NSString *langaugeProjPath = [sourcePath stringByAppendingPathComponent:lproj];
+            NSString *const langaugeProjPath = [sourcePath stringByAppendingPathComponent:lproj];
             for (NSString *languageSubfile in [fileManager contentsOfDirectoryAtPath:langaugeProjPath error:NULL]) {
                 if (![languageSubfile.pathExtension isEqual:@"strings"])
                     continue;
@@ -88,56 +91,106 @@ int main(int argc, const char *argv[])
                     continue;
                 }
                 
-                DMStringsFileScanner *scanner = [[DMStringsFileScanner alloc] initWithString:stringsContents];
+                NSError *regularExpressionError = nil;
+                NSRegularExpression *const xibCommentRegularExpression = [NSRegularExpression regularExpressionWithPattern:@"^/\\* Class = \"\\S+\"; (\\S+) = \"(.*)\"; ObjectID = \"(\\d+)\"; \\*/$" options:NSRegularExpressionAnchorsMatchLines error:&regularExpressionError];
+                if (!xibCommentRegularExpression) {
+                    fputs([[NSString stringWithFormat:@"Regular expression error: %@.\n", regularExpressionError] UTF8String], stderr);
+                    exit(EXIT_FAILURE);
+                }
+
+                DMStringsFileScanner *const scanner = [[DMStringsFileScanner alloc] initWithString:stringsContents];
                 scanner.filePathForErrorLog = stringsPath;
-                
-                NSString *lastLocalizedString = nil;
-                DMFormatString *lastDevFormatString = nil, *lastLocalizedFormatString = nil;
+
+
+                DMFormatString *keyFormatString = nil, *xibKeyFormatString = nil, *valueFormatString = nil;
                 while (![scanner isAtEnd]) {
                     __autoreleasing NSString *matchString = nil;
                     DMStringsFileTokenType scannedToken;
                     BOOL stringTokenIsQuoted;
                     
-                    if ([scanner scanNextValidStringsTokenIntoString:&matchString tokenType:&scannedToken stringQuoted:&stringTokenIsQuoted]) {
-                        switch (scannedToken) {
-                            case DMStringsFileTokenKeyString:
-                                lastDevFormatString = [[DMFormatString alloc] initWithString:[DMStringsFileScanner unquotedString:matchString if:stringTokenIsQuoted]];
-                                if (!lastDevFormatString)
-                                    fputs([[NSString stringWithFormat:@"%@: Warning: Invalid key format string %@\n", stringsPath, matchString] UTF8String], stderr), hadParseError = YES;
-                                break;
-                                
-                            case DMStringsFileTokenValueString:
-                                lastLocalizedString = [DMStringsFileScanner unquotedString:matchString if:stringTokenIsQuoted];
-                                // lastLocalizedString = [lastLocalizedString stringByTrimmingCharactersInSet:[NSCharacterSet characterSetWithCharactersInString:@"\u261b\u261e"]];  // Clean up legacy translation markers ("hand" characters)
-                                lastLocalizedFormatString = [[DMFormatString alloc] initWithString:lastLocalizedString];
-                                if (!lastLocalizedFormatString)
-                                    fputs([[NSString stringWithFormat:@"%@: Warning: Invalid localized format string %@\n", stringsPath, matchString] UTF8String], stderr), hadParseError = YES;
-                                break;
-                                
-                            case DMStringsFileTokenPairTerminator:
-                                if (lastDevFormatString && lastLocalizedFormatString) {
-                                    if ([scanner scanString:DMNeedsLocalizationMarker intoString:NULL])
-                                        break; // Pair wasn't localized
-                                    
-#ifdef SET_NEEDS_LOCALIZATION_IF_SAME_AS_DEV_STRING
-                                    if ([lastLocalizedFormatString isEqual:lastDevFormatString])
-                                        break;
-#endif
-                                    
-                                    if ([scanner scanString:DMLocalizationOutOfContextMarker intoString:NULL] || [languageSubfile isEqual:DMOrphanedStringsFilename])
-                                        [mapping addLocalization:lastLocalizedFormatString forDevString:lastDevFormatString context:nil];
-                                    else
-                                        [mapping addLocalization:lastLocalizedFormatString forDevString:lastDevFormatString context:languageSubfile];
-                                    [localizationKeys addObject:lastDevFormatString];
-                                }
-                            default:
-                                break;
-                        }
-                    } else {
-                        NSUInteger replayChars = MIN(20u, scanner.scanLocation);
+                    if (![scanner scanNextValidStringsTokenIntoString:&matchString tokenType:&scannedToken stringQuoted:&stringTokenIsQuoted]) {
+                        const NSUInteger replayChars = MIN(20u, scanner.scanLocation);
                         fputs([[NSString stringWithFormat:@"%@: Error: Unexpected token at %lu, around: %@\n", stringsPath, scanner.scanLocation, [scanner.string substringWithRange:NSMakeRange(scanner.scanLocation - replayChars, replayChars)]] UTF8String], stderr);
                         hadParseError = YES;
                         break; // If we didn't progress, we have a problem
+                    }
+
+                    switch (scannedToken) {
+                        case DMStringsFileTokenComment: {
+                            // If we're parsing a XIB, we want to use the comment line before the “"foo" = "le foo";” line to set up our keys, for two reasons: (1) we used to use the English strings as the key, but 10.8 introduced their own automatic XIB localization which use the style “222.title = "foo";”, and we have to accept both new and old-style strings files at least for the next while, and (2) we want to cross-index each translation, both using the new-style XIB key and the old English word, so if the same key appears elsewhere but is missing a translation  we can auto-fill in this one (this will happen every time an object in our XIB has its OID change, so it'll be somewhat common).
+
+                            // example of a XIB comment: /* Class = "NSMenuItem"; title = "Fi\"le"; ObjectID = "83"; */
+                            // next line would be: "83.title" = "Fi\"le";
+                            if ([matchString hasPrefix:@"/* Class ="] && [matchString hasSuffix:@"*/"]) {
+                                NSTextCheckingResult *const result = [xibCommentRegularExpression firstMatchInString:matchString options:0 range:(NSRange){0, matchString.length}];
+                                if (result.numberOfRanges == 4) {
+                                    keyFormatString = [[DMFormatString alloc] initWithString:[matchString substringWithRange:[result rangeAtIndex:2]]]; // eg: "foo"
+                                    NSString *const xibPropertyKeyString = [matchString substringWithRange:[result rangeAtIndex:1]]; // eg: "title"
+                                    NSString *const objectIDStringPrefix = [[matchString substringWithRange:[result rangeAtIndex:3]] stringByAppendingString:@"."]; // eg: "979"
+                                    xibKeyFormatString = [[DMFormatString alloc] initWithString:[([xibPropertyKeyString hasPrefix:objectIDStringPrefix] ? @"" : objectIDStringPrefix) stringByAppendingString:xibPropertyKeyString]]; // eg: "22.title" — NOTE: handle bullshit like: /* Class = "NSSegmentedCell"; 979.ibShadowedLabels[0] = "Address Book"; ObjectID = "979"; */
+                                }
+                            }
+                            break;
+                        }
+
+                        case DMStringsFileTokenKeyString: {
+                            DMFormatString *const lineKeyFormatString = [[DMFormatString alloc] initWithString:[DMStringsFileScanner unquotedString:matchString if:stringTokenIsQuoted]];
+                            if (!lineKeyFormatString) {
+                                fputs([[NSString stringWithFormat:@"%@: Warning: Invalid key format string %@\n", stringsPath, matchString] UTF8String], stderr);
+                                hadParseError = YES;
+                            }
+
+                            if (!keyFormatString)
+                                keyFormatString = lineKeyFormatString;
+
+                            else if (!xibKeyFormatString) {
+                                fputs([[NSString stringWithFormat:@"%@: Warning: key format string “%@” has previous value(?) “%@”\n", stringsPath, lineKeyFormatString, keyFormatString] UTF8String], stderr);
+                                hadParseError = YES;
+
+                            } else { // just make sure this key matches one of the keys we read from the XIB, earlier
+                                if (![lineKeyFormatString isEqual:keyFormatString] && ![lineKeyFormatString isEqual:xibKeyFormatString]) {
+                                    fputs([[NSString stringWithFormat:@"%@: Warning: key format string “%@” doesn't match keys in XIB comment “%@” “%@”\n", stringsPath, lineKeyFormatString, keyFormatString, xibKeyFormatString] UTF8String], stderr);
+                                    hadParseError = YES;
+                                }
+                            }
+                            break;
+                        }
+
+                        case DMStringsFileTokenValueString: {
+                            // NSString *const valueString = [DMStringsFileScanner unquotedString:matchString if:stringTokenIsQuoted];
+                            // lastLocalizedString = [lastLocalizedString stringByTrimmingCharactersInSet:[NSCharacterSet characterSetWithCharactersInString:@"\u261b\u261e"]];  // Clean up legacy translation markers ("hand" characters)
+                            valueFormatString = [[DMFormatString alloc] initWithString:[DMStringsFileScanner unquotedString:matchString if:stringTokenIsQuoted]];
+                            if (!valueFormatString)
+                                fputs([[NSString stringWithFormat:@"%@: Warning: Invalid localized format string %@\n", stringsPath, matchString] UTF8String], stderr), hadParseError = YES;
+                            break;
+                        }
+
+                        case DMStringsFileTokenPairTerminator:
+                            if (keyFormatString && valueFormatString) {
+                                if ([scanner scanString:DMNeedsLocalizationMarker intoString:NULL])
+                                    break; // Pair wasn't localized
+                                else if ([valueFormatString.description rangeOfString:@"??"].length)
+                                    break; // Old localizations may still have some of these knocking around, clean them out whenever we can. eg: /* Class = "NSTextFieldCell"; title = "???? synopsis body"; ObjectID = "222"; */
+
+#ifdef SET_NEEDS_LOCALIZATION_IF_SAME_AS_DEV_STRING
+                                if ([valueFormatString isEqual:keyFormatString])
+                                    break;
+#endif
+
+                                NSString *const scanContextString = ([scanner scanString:DMLocalizationOutOfContextMarker intoString:NULL] || [languageSubfile isEqual:DMOrphanedStringsFilename]) ? nil : languageSubfile;
+
+                                [mapping addLocalization:valueFormatString forDevString:keyFormatString context:scanContextString];
+                                if (xibKeyFormatString) {
+                                    [mapping addLocalization:valueFormatString forDevString:xibKeyFormatString context:scanContextString];
+                                    //fprintf(stderr, "“%s”,“%s”->“%s” \n", keyFormatString.description.UTF8String, xibKeyFormatString.description.UTF8String, valueFormatString.description.UTF8String);
+                                }
+
+                                [localizationKeys addObject:xibKeyFormatString ? : keyFormatString]; // prefer XIB key since that's the one we'll mark as being used, below
+
+                                keyFormatString = xibKeyFormatString = valueFormatString = nil;
+                            }
+                        default:
+                            break;
                     }
                 }
             }
@@ -148,69 +201,74 @@ int main(int argc, const char *argv[])
             fputs([[NSString stringWithFormat:@"Parse error building localization tables; aborting.\n"] UTF8String], stderr);
             return EXIT_FAILURE;
         }
-        
-        /*
-         * For each development language strings file, build a new localized file for each target language.
-         */
+
+        //
+        // STEP 3:
+        // For each development language strings file, build a new localized file for each target language.
+        //
         NSMutableSet *const templateStringSet = [NSMutableSet new];
         NSMutableDictionary *const unlocalizedStringRoughCountByLanguage = [NSMutableDictionary new]; // lang.lproj to NSNumber (NSUInteger), the number of strings for which a translation was not available, with fudging to include strings that are supposedly localized but are the same as the development string
         for (NSString *devStringsComponent in devLanguageStringsFiles) {
             fputs([[NSString stringWithFormat:@"Localizing %@\n", devStringsComponent] UTF8String], stdout);
             
-            // We'll parse this file manually to preserve comments and all that
             NSString *const templateStringsPath = [[resourcesPath stringByAppendingPathComponent:templateLanguageLproj] stringByAppendingPathComponent:devStringsComponent];
             NSString *const templateStringsContents = [NSString stringWithContentsOfFile:templateStringsPath usedEncoding:NULL error:NULL];
             
             for (NSString *lproj in targetLanguageLprojs) {
-                DMLocalizationMapping *mapping = translationTables[lproj];
-                NSMutableSet *unusedLocalizationKeys = unusedLocalizations[lproj];
+                DMLocalizationMapping *const mapping = translationTables[lproj];
+                NSMutableSet *const unusedLocalizationKeys = unusedLocalizations[lproj];
                 NSUInteger unlocalizedStringRoughCount = [unlocalizedStringRoughCountByLanguage[lproj] unsignedIntegerValue];
                 
-                NSMutableString *localizedTranscription = [NSMutableString string];
-                NSMutableString *savedTranscriptionForDoNotLocalize = localizedTranscription;
-                DMStringsFileScanner *scanner = [[DMStringsFileScanner alloc] initWithString:templateStringsContents];
-                scanner.filePathForErrorLog = templateStringsPath;
+                NSMutableString *mutableLocalizedStringsInTargetLanguageString = [NSMutableString string];
+                DMStringsFileScanner *const templateStringsScanner = [[DMStringsFileScanner alloc] initWithString:templateStringsContents];
+                templateStringsScanner.filePathForErrorLog = templateStringsPath;
                 
-                DMFormatString *lastDevFormatString = nil;
+                DMFormatString *keyFormatString = nil;
+                BOOL keyAppearsToBeFromXIB = NO;
                 DMMatchLevel lastFormatStringMatchLevel;
-                NSMutableSet *devStringsCountedForLproj = [NSMutableSet new];
-                while (![scanner isAtEnd]) {
+                NSMutableSet *const devStringsCountedForLproj = [NSMutableSet new];
+                while (!templateStringsScanner.isAtEnd) {
                     __autoreleasing NSString *matchString = nil;
                     DMStringsFileTokenType scannedToken;
                     BOOL stringTokenIsQuoted;
                     
-                    if ([scanner scanNextValidStringsTokenIntoString:&matchString tokenType:&scannedToken stringQuoted:&stringTokenIsQuoted]) {
+                    if ([templateStringsScanner scanNextValidStringsTokenIntoString:&matchString tokenType:&scannedToken stringQuoted:&stringTokenIsQuoted]) {
                         switch (scannedToken) {
                             case DMStringsFileTokenComment:
+                                keyAppearsToBeFromXIB = [matchString hasPrefix:@"/* Class ="] && [matchString hasSuffix:@"*/"];
+                                    // FALL THROUGH
                             case DMStringsFileTokenWhitespace:
                             case DMStringsFileTokenPairSeparator:
-                                [localizedTranscription appendString:matchString];
+                                [mutableLocalizedStringsInTargetLanguageString appendString:matchString];
                                 break;
                                 
                             case DMStringsFileTokenKeyString:
-                                if ([matchString rangeOfString:DMDoNotLocalizeMarker].length > 0)
-                                    localizedTranscription = nil; // Short-circuit until we hit the end of this key
-                                
                                 [templateStringSet addObject:matchString];
-                                lastDevFormatString = [[DMFormatString alloc] initWithString:[DMStringsFileScanner unquotedString:matchString if:stringTokenIsQuoted]];
-                                if (!lastDevFormatString) {
+
+                                keyFormatString = [[DMFormatString alloc] initWithString:[DMStringsFileScanner unquotedString:matchString if:stringTokenIsQuoted]];
+                                if (!keyFormatString) {
                                     fputs([[NSString stringWithFormat:@"%@: Error: Invalid key format string %@\n", templateStringsPath, matchString] UTF8String], stderr);
                                     exit(EXIT_FAILURE);
                                 }
-                                [localizedTranscription appendString:matchString];
+                                [mutableLocalizedStringsInTargetLanguageString appendString:matchString];
                                 break;
                                 
                             case DMStringsFileTokenValueString: {
-                                NSCAssert(lastDevFormatString, nil);
-                                DMFormatString *localizedFormatString = [mapping bestLocalizedFormatStringForDevString:lastDevFormatString forContext:devStringsComponent matchLevel:&lastFormatStringMatchLevel];
-                                if (!localizedFormatString) // Use development language
-                                    localizedFormatString = [[DMFormatString alloc] initWithString:[DMStringsFileScanner unquotedString:matchString if:stringTokenIsQuoted]];
+                                NSCAssert(keyFormatString, nil);
+
+                                DMFormatString *const baseLanguageValueFormatString = [[DMFormatString alloc] initWithString:[DMStringsFileScanner unquotedString:matchString if:stringTokenIsQuoted]];
+
+                                DMFormatString *valueFormatString = [mapping bestLocalizedFormatStringForDevString:keyFormatString forContext:devStringsComponent matchLevel:&lastFormatStringMatchLevel];
+                                if (keyAppearsToBeFromXIB && lastFormatStringMatchLevel != DMMatchSameContext) // Look up using base's right-hand-side, so we find from actual English word, not opaque key, eg: "83.title" = "File";
+                                        valueFormatString = [mapping bestLocalizedFormatStringForDevString:baseLanguageValueFormatString forContext:devStringsComponent matchLevel:&lastFormatStringMatchLevel];
+                                if (!valueFormatString) // Use development language
+                                    valueFormatString = baseLanguageValueFormatString;
                                 
-                                if (lastFormatStringMatchLevel == DMMatchNone && localizedFormatString.probablyNeedsNoLocalization)
+                                if (lastFormatStringMatchLevel == DMMatchNone && valueFormatString.probablyNeedsNoLocalization)
                                     lastFormatStringMatchLevel = DMMatchSameContext; // Default strings that are just punctuation, digits, etc. as localized
-                                NSString *resultString = [localizedFormatString stringByMatchingFormatString:lastDevFormatString];
-                                [unusedLocalizationKeys removeObject:lastDevFormatString];
-                                [localizedTranscription appendFormat:@"\"%@\"", resultString];
+                                NSString *const resultString = [valueFormatString stringByMatchingFormatString:keyFormatString];
+                                [unusedLocalizationKeys removeObject:keyFormatString];
+                                [mutableLocalizedStringsInTargetLanguageString appendFormat:@"\"%@\"", resultString];
                                 
                                 if (lastFormatStringMatchLevel == DMMatchNone && ![devStringsCountedForLproj containsObject:matchString]) {
                                     [devStringsCountedForLproj addObject:matchString];
@@ -219,36 +277,37 @@ int main(int argc, const char *argv[])
                                 break;
                             }
                             case DMStringsFileTokenPairTerminator:
-                                [localizedTranscription appendString:matchString];
+                                [mutableLocalizedStringsInTargetLanguageString appendString:matchString];
                                 switch (lastFormatStringMatchLevel) {
                                     case DMMatchNone:
-                                        [localizedTranscription appendString:DMNeedsLocalizationMarker]; break;
+                                        [mutableLocalizedStringsInTargetLanguageString appendString:DMNeedsLocalizationMarker]; break;
                                     case DMMatchDifferentContext:
-                                        [localizedTranscription appendString:DMLocalizationOutOfContextMarker]; break;
+                                        [mutableLocalizedStringsInTargetLanguageString appendString:DMLocalizationOutOfContextMarker]; break;
                                     case DMMatchSameContext:
                                         break; // No attention needed
                                 }
-                                localizedTranscription = savedTranscriptionForDoNotLocalize; // Will already be the same unless localization was disabled for a pair
-                                lastDevFormatString = nil;
+
+                                keyFormatString = nil;
                                 break;
                         }
+                        
                     } else {
-                        NSUInteger replayChars = MIN(20u, scanner.scanLocation);
-                        fputs([[NSString stringWithFormat:@"%@: Error: Unexpected token at %lu, around: %@\n", templateStringsPath, scanner.scanLocation, [scanner.string substringWithRange:NSMakeRange(scanner.scanLocation - replayChars, replayChars)]] UTF8String], stderr);
+                        const NSUInteger replayChars = MIN(20u, templateStringsScanner.scanLocation);
+                        fputs([[NSString stringWithFormat:@"%@: Error: Unexpected token at %lu, around: %@\n", templateStringsPath, templateStringsScanner.scanLocation, [templateStringsScanner.string substringWithRange:NSMakeRange(templateStringsScanner.scanLocation - replayChars, replayChars)]] UTF8String], stderr);
                         break; // If we didn't progress, we have a problem
                     }
                 }
                 
-                if (![scanner isAtEnd]) // We didn't process the file completely
+                if (![templateStringsScanner isAtEnd]) // We didn't process the file completely
                     break; // Break out of processing this strings file for all languages
                 
-                if ([localizedTranscription characterAtIndex:(localizedTranscription.length - 1)] != '\n')
-                    [localizedTranscription appendString:@"\n"];
+                if ([mutableLocalizedStringsInTargetLanguageString characterAtIndex:(mutableLocalizedStringsInTargetLanguageString.length - 1)] != '\n')
+                    [mutableLocalizedStringsInTargetLanguageString appendString:@"\n"];
                 
                 unlocalizedStringRoughCountByLanguage[lproj] = @(unlocalizedStringRoughCount);
                 NSString *localizedStringsPath = [[sourcePath stringByAppendingPathComponent:lproj] stringByAppendingPathComponent:devStringsComponent];
                 __autoreleasing NSError *writeError = nil;
-                if (![localizedTranscription writeToFile:localizedStringsPath atomically:YES encoding:NSUTF8StringEncoding error:&writeError])
+                if (![mutableLocalizedStringsInTargetLanguageString writeToFile:localizedStringsPath atomically:YES encoding:NSUTF8StringEncoding error:&writeError])
                     fputs([[NSString stringWithFormat:@"%@: Error writing localized strings file: %@", localizedStringsPath, writeError] UTF8String], stderr);
             }
         }
