@@ -41,7 +41,7 @@ int main(int argc, const char *argv[])
         }
         
         //
-        // STEP 1:
+        // STEP 1: Parse Example.lproj
         // Build index of strings files in the development language, and the target translation languages
         //
         NSMutableSet *const devLanguageStringsFiles = [NSMutableSet set]; {
@@ -64,7 +64,7 @@ int main(int argc, const char *argv[])
 
 
         //
-        // STEP 2:
+        // STEP 2: Build corpus
         // First, for each language, build a DMLocalizationMapping of each key-value pair, also storing the name of the strings file in which each pair was found.
         //
         fputs([@"Building translation tables\n" UTF8String], stdout);
@@ -165,17 +165,14 @@ int main(int argc, const char *argv[])
                             break;
                         }
 
-                        case DMStringsFileTokenPairTerminator:
-                            if (keyFormatString && valueFormatString) {
-                                if ([scanner scanString:DMNeedsLocalizationMarker intoString:NULL])
-                                    break; // Pair wasn't localized
-                                else if ([valueFormatString.description rangeOfString:@"??"].length)
-                                    break; // Old localizations may still have some of these knocking around, clean them out whenever we can. eg: /* Class = "NSTextFieldCell"; title = "???? synopsis body"; ObjectID = "222"; */
-
+                        case DMStringsFileTokenPairTerminator: {
+                            if (keyFormatString && valueFormatString
 #ifdef SET_NEEDS_LOCALIZATION_IF_SAME_AS_DEV_STRING
-                                if ([valueFormatString isEqual:keyFormatString])
-                                    break;
+                                && ![valueFormatString isEqual:keyFormatString])
 #endif
+                                && ![scanner scanString:DMNeedsLocalizationMarker intoString:NULL] // Pair wasn't localized
+                                && ![valueFormatString.description rangeOfString:@"??"].length) { // Old localizations may still have some of these knocking around, clean them out whenever we can. eg: /* Class = "NSTextFieldCell"; title = "???? synopsis body"; ObjectID = "222"; */
+
 
                                 NSString *const scanContextString = ([scanner scanString:DMLocalizationOutOfContextMarker intoString:NULL] || [languageSubfile isEqual:DMOrphanedStringsFilename]) ? nil : languageSubfile;
 
@@ -186,9 +183,9 @@ int main(int argc, const char *argv[])
                                 }
 
                                 [localizationKeys addObject:xibKeyFormatString ? : keyFormatString]; // prefer XIB key since that's the one we'll mark as being used, below
-
-                                keyFormatString = xibKeyFormatString = valueFormatString = nil;
                             }
+                            keyFormatString = xibKeyFormatString = valueFormatString = nil; // gotta clear these out WHENEVER we see the end of any key/value pair or we throw bogus errors like: "key format string x has previous value(?) y"
+                        }
                         default:
                             break;
                     }
@@ -203,7 +200,7 @@ int main(int argc, const char *argv[])
         }
 
         //
-        // STEP 3:
+        // STEP 3: localize
         // For each development language strings file, build a new localized file for each target language.
         //
         NSMutableSet *const templateStringSet = [NSMutableSet new];
