@@ -27,16 +27,11 @@ int main(int argc, const char *argv[])
         NSDictionary *const environmentDictionary = [NSProcessInfo processInfo].environment;
         
         // Set paths
-        NSString *resourcesPath, *sourcePath;
-        if (environmentDictionary[@"TARGET_BUILD_DIR"]) {
-            resourcesPath = [environmentDictionary[@"TARGET_BUILD_DIR"] stringByAppendingPathComponent:environmentDictionary[@"UNLOCALIZED_RESOURCES_FOLDER_PATH"]];
-            sourcePath = environmentDictionary[@"SRCROOT"];
-        } else {
-            resourcesPath = [@"~/Library/Developer/Xcode/DerivedData/UberLibrary-btotfnkzlnxlxgahpezzqtypnhpm/Build/Products/Debug/Delicious Library 3.app/Contents/Resources" stringByExpandingTildeInPath];
+        NSString *sourcePath = environmentDictionary[@"SRCROOT"];
+        if (!sourcePath)
             sourcePath = [@"~/Source/UberLibrary/Library" stringByExpandingTildeInPath];
-        }
-        if (![fileManager fileExistsAtPath:resourcesPath] || ![fileManager fileExistsAtPath:sourcePath]) {
-            fputs([[NSString stringWithFormat:@"Error: Resources and source directories must exist (%@ and %@)\n", resourcesPath, sourcePath] UTF8String], stderr);
+        if (![fileManager fileExistsAtPath:sourcePath]) {
+            fputs([[NSString stringWithFormat:@"Error: source directory must exist (%@)\n", sourcePath] UTF8String], stderr);
             exit(EXIT_FAILURE);
         }
         
@@ -45,7 +40,7 @@ int main(int argc, const char *argv[])
         // Build index of strings files in the development language, and the target translation languages
         //
         NSMutableSet *const devLanguageStringsFiles = [NSMutableSet set]; {
-            for (NSString *languageSubfile in [fileManager contentsOfDirectoryAtPath:[resourcesPath stringByAppendingPathComponent:templateLanguageLproj] error:NULL])
+            for (NSString *languageSubfile in [fileManager contentsOfDirectoryAtPath:[sourcePath stringByAppendingPathComponent:templateLanguageLproj] error:NULL])
                 if ([languageSubfile.pathExtension isEqualToString:@"strings"])
                     [devLanguageStringsFiles addObject:languageSubfile];
         }
@@ -208,7 +203,7 @@ int main(int argc, const char *argv[])
         for (NSString *devStringsComponent in devLanguageStringsFiles) {
             fputs([[NSString stringWithFormat:@"Localizing %@\n", devStringsComponent] UTF8String], stdout);
             
-            NSString *const templateStringsPath = [[resourcesPath stringByAppendingPathComponent:templateLanguageLproj] stringByAppendingPathComponent:devStringsComponent];
+            NSString *const templateStringsPath = [[sourcePath stringByAppendingPathComponent:templateLanguageLproj] stringByAppendingPathComponent:devStringsComponent];
             NSString *const templateStringsContents = [NSString stringWithContentsOfFile:templateStringsPath usedEncoding:NULL error:NULL];
             
             for (NSString *lproj in targetLanguageLprojs) {
