@@ -36,8 +36,6 @@ int main(int argc, const char *argv[])
                                                                                      @"/* Class = \"NSBox\"; title = \"Box\";",
                                                                                      /* Class = "NSButtonCell"; title = "Radio"; ObjectID = "472"; */
                                                                                      @"/* Class = \"NSButtonCell\"; title = \"Radio\";",
-                                                                                     /* Class = "NSMenu"; title = "ANYTHING"; ObjectID = "15"; */
-                                                                                     @"/* Class = \"NSMenu\"; title = \"",
                                                                                      /* Class = "NSWindow"; title = "Window"; ObjectID = "80"; */
                                                                                      @"/* Class = \"NSWindow\"; title = \"Window\";",
                                                                                      // older style (starts with "Item1")
@@ -77,11 +75,14 @@ int main(int argc, const char *argv[])
                 }
                 // see if this is one of the common garbage strings IB inserts in XIBs, so we don't force our
                 BOOL skipLine = NO;
-                for (NSString *skipCommentPrefix in commentPrefixesForStringsThatReallyDoNotNeedToBeLocalized)
-                    if ([lastComment hasPrefix:skipCommentPrefix]) {
-                        skipLine = YES;
+                for (NSString *skipCommentPrefix in commentPrefixesForStringsThatReallyDoNotNeedToBeLocalized) {
+                    skipLine = [lastComment hasPrefix:skipCommentPrefix];
+                    if (skipLine)
                         break;
-                    }
+                }
+                if (!skipLine && ![filename isEqualToString:@"MainMenu.strings"]) // NSMenu titles are ONLY shown in main menu, AFAIK.
+                /* Class = "NSMenu"; title = "ANYTHING"; ObjectID = "15"; */
+                    skipLine = [lastComment hasPrefix:@"/* Class = \"NSMenu\"; title = \""];
                 if (skipLine) {
 #if LOG_INFO
                     printf("%s:%lu info: skipped line, comment matched blacklist: “%s”\n", filename.UTF8String, (unsigned long)lineCount, lastComment.UTF8String);
