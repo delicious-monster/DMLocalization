@@ -27,7 +27,7 @@ int main(int argc, const char *argv[])
             return -1;
         }
 
-        NSString *const doNotLocalizeMarker = @"??";
+        NSString *const doNotLocalizeMarker = @"??", *const doNotLocalizeMarker2 = @"⌧";
         NSArray *const commentPrefixesForStringsThatReallyDoNotNeedToBeLocalized = @[
                                                                                      // Skip examples:
                                                                                      /* Class = "NSTextFieldCell"; title = "Text Cell"; ObjectID = "532"; */
@@ -67,7 +67,7 @@ int main(int argc, const char *argv[])
             } else if ([line hasPrefix:@"\""] && [line hasSuffix:@"\";"]) { // eg: "136.title" = "Quit Library";
 
                 // see if this contains our marker ("??") for placeholder strings that shouldn't be localized
-                if ([line rangeOfString:doNotLocalizeMarker].length) {
+                if ([line rangeOfString:doNotLocalizeMarker].length || [line rangeOfString:doNotLocalizeMarker2].length) {
 #if LOG_INFO
                     printf("%s:%lu info: skipped line, ‘??’ found: “%s”\n", filename.UTF8String, (unsigned long)lineCount, line.UTF8String);
 #endif
