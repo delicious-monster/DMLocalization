@@ -167,8 +167,8 @@ int main(int argc, const char *argv[])
                                     && ![valueFormatString isEqual:keyFormatString])
 #endif
                                     && ![scanner scanString:DMNeedsLocalizationMarker intoString:NULL] // Pair wasn't localized
-                                    && ![valueFormatString.description rangeOfString:@"??"].length) { // Old localizations may still have some of these knocking around, clean them out whenever we can. eg: /* Class = "NSTextFieldCell"; title = "???? synopsis body"; ObjectID = "222"; */
-
+                                    && ![valueFormatString.description rangeOfString:@"??"].length // Old localizations may still have some of these knocking around, clean them out whenever we can. eg: /* Class = "NSTextFieldCell"; title = "???? synopsis body"; ObjectID = "222"; */
+                                    && ![valueFormatString.description rangeOfString:@"⌧"].length) { // extra safety in case my new "don't localize" slips through
 
                                         NSString *const scanContextString = ([scanner scanString:DMLocalizationOutOfContextMarker intoString:NULL] || [languageSubfile isEqual:DMOrphanedStringsFilename]) ? nil : languageSubfile;
 
@@ -193,6 +193,12 @@ int main(int argc, const char *argv[])
                     fputs([[NSString stringWithFormat:@"Parse error building localization tables; aborting.\n"] UTF8String], stderr);
                     return EXIT_FAILURE;
                 }
+
+                // clean out unlocalized strings folder early, because some of the base strings files might have disappeared, and we don't want to leave turds around (and we regenerate them all in a second anyhow)
+                if ([fileManager fileExistsAtPath:languageProjUnlocalizedStringsFolderPath])
+                    for (NSString *languageSubfile in [fileManager contentsOfDirectoryAtPath:languageProjUnlocalizedStringsFolderPath error:NULL])
+                        [fileManager removeItemAtPath:[languageProjUnlocalizedStringsFolderPath stringByAppendingPathComponent:languageSubfile] error:NULL];
+
 
                 //
                 // STEP 3: localize
@@ -321,9 +327,7 @@ int main(int argc, const char *argv[])
                         __autoreleasing NSError *writeError = nil;
                         if (![mutableUnlocalizedStringsInTargetLanguageString writeToFile:unlocalizedStringsPath atomically:NO encoding:NSUTF8StringEncoding error:&writeError])
                             fputs([[NSString stringWithFormat:@"          %@/%@: Error writing unlocalized strings file: %@", DMUnlocalizedStringsFolderName, devStringsComponent, writeError] UTF8String], stderr);
-                    } else
-                        [fileManager removeItemAtPath:unlocalizedStringsPath error:NULL];
-
+                    }
                 }
 
                 /*
