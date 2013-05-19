@@ -15,6 +15,7 @@
 
 
 //#define SET_NEEDS_LOCALIZATION_IF_SAME_AS_DEV_STRING
+static NSString *const DMUnlocalizedStringsFolderName = @"_unlocalized strings";
 static NSString *const DMOrphanedStringsFilename = @"_unused do not localize.strings";
 static NSString *const DMNeedsLocalizationMarker = @" /*!!! Needs translation, delete this comment when translated !!!*/";
 static NSString *const DMLocalizationOutOfContextMarker = @" /*!!! Translation found in different context, delete this comment if ok !!!*/";
@@ -72,12 +73,13 @@ int main(int argc, const char *argv[])
                 //
                 DMLocalizationMapping *const languageCorpus = [[DMLocalizationMapping alloc] initWithName:lproj];
                 NSMutableSet *const unusedLocalizationKeys = [NSMutableSet set];
-                NSString *const langaugeProjPath = [sourcePath stringByAppendingPathComponent:lproj];
+                NSString *const languageProjPath = [sourcePath stringByAppendingPathComponent:lproj];
+                NSString *const languageProjUnlocalizedStringsFolderPath = [languageProjPath stringByAppendingPathComponent:DMUnlocalizedStringsFolderName];
 
-                for (NSString *languageSubfile in [fileManager contentsOfDirectoryAtPath:langaugeProjPath error:NULL]) {
+                for (NSString *languageSubfile in [fileManager contentsOfDirectoryAtPath:languageProjPath error:NULL]) {
                     if (![languageSubfile.pathExtension isEqual:@"strings"])
                         continue;
-                    NSString *stringsPath = [langaugeProjPath stringByAppendingPathComponent:languageSubfile];
+                    NSString *stringsPath = [languageProjPath stringByAppendingPathComponent:languageSubfile];
                     NSString *stringsContents = [NSString stringWithContentsOfFile:stringsPath usedEncoding:NULL error:NULL];
                     if (!stringsContents) {
                         fputs([[NSString stringWithFormat:@"%@: Error: Unable to read strings file\n", stringsPath] UTF8String], stderr);
@@ -204,11 +206,12 @@ int main(int argc, const char *argv[])
                     NSString *const templateStringsPath = [[sourcePath stringByAppendingPathComponent:templateLanguageLproj] stringByAppendingPathComponent:devStringsComponent];
                     NSString *const templateStringsContents = [NSString stringWithContentsOfFile:templateStringsPath usedEncoding:NULL error:NULL];
 
-                    NSMutableString *mutableLocalizedStringsInTargetLanguageString = [NSMutableString string];
+                    NSMutableString *const mutableLocalizedStringsInTargetLanguageString = [NSMutableString new], *const mutableUnlocalizedStringsInTargetLanguageString = [NSMutableString new];
                     DMStringsFileScanner *const templateStringsScanner = [[DMStringsFileScanner alloc] initWithString:templateStringsContents];
                     templateStringsScanner.filePathForErrorLog = templateStringsPath;
 
                     DMFormatString *keyFormatString = nil;
+                    NSMutableString *mutableSingleEntryString = [NSMutableString new];
                     BOOL keyAppearsToBeFromXIB = NO;
                     DMMatchLevel lastFormatStringMatchLevel;
                     NSMutableSet *const devStringsCountedForLproj = [NSMutableSet new];
@@ -229,7 +232,7 @@ int main(int argc, const char *argv[])
                                 // FALL THROUGH
                             case DMStringsFileTokenWhitespace:
                             case DMStringsFileTokenPairSeparator:
-                                [mutableLocalizedStringsInTargetLanguageString appendString:matchString];
+                                [mutableSingleEntryString appendString:matchString];
                                 break;
 
                             case DMStringsFileTokenKeyString:
@@ -240,7 +243,7 @@ int main(int argc, const char *argv[])
                                     fputs([[NSString stringWithFormat:@"%@: Error: Invalid key format string %@\n", templateStringsPath, matchString] UTF8String], stderr);
                                     exit(EXIT_FAILURE);
                                 }
-                                [mutableLocalizedStringsInTargetLanguageString appendString:matchString];
+                                [mutableSingleEntryString appendString:matchString];
                                 break;
 
                             case DMStringsFileTokenValueString: {
@@ -258,7 +261,7 @@ int main(int argc, const char *argv[])
                                     lastFormatStringMatchLevel = DMMatchSameContext; // Default strings that are just punctuation, digits, etc. as localized
                                 NSString *const resultString = [valueFormatString stringByMatchingFormatString:keyFormatString];
                                 [unusedLocalizationKeys removeObject:keyFormatString];
-                                [mutableLocalizedStringsInTargetLanguageString appendFormat:@"\"%@\"", resultString];
+                                [mutableSingleEntryString appendFormat:@"\"%@\"", resultString];
 
                                 if (lastFormatStringMatchLevel == DMMatchNone && ![devStringsCountedForLproj containsObject:matchString]) {
                                     [devStringsCountedForLproj addObject:matchString];
@@ -267,52 +270,78 @@ int main(int argc, const char *argv[])
                                 break;
                             }
                             case DMStringsFileTokenPairTerminator: {
-                                [mutableLocalizedStringsInTargetLanguageString appendString:matchString];
+                                [mutableSingleEntryString appendString:matchString];
                                 switch (lastFormatStringMatchLevel) {
                                     case DMMatchNone: {
-                                        [mutableLocalizedStringsInTargetLanguageString appendString:DMNeedsLocalizationMarker];
+                                        [mutableSingleEntryString appendString:DMNeedsLocalizationMarker];
+                                        [mutableUnlocalizedStringsInTargetLanguageString appendString:mutableSingleEntryString];
                                         break;
                                     }
                                     case DMMatchDifferentContext: {
                                         guessingStringCount++;
-                                        [mutableLocalizedStringsInTargetLanguageString appendString:DMLocalizationOutOfContextMarker];
+                                        [mutableSingleEntryString appendString:DMLocalizationOutOfContextMarker];
+                                        [mutableLocalizedStringsInTargetLanguageString appendString:mutableSingleEntryString];
                                         break;
                                     }
                                     case DMMatchSameContext: {
                                         translatedStringCount++;
+                                        [mutableLocalizedStringsInTargetLanguageString appendString:mutableSingleEntryString];
                                         break; // No attention needed
                                     }
                                 }
 
+                                mutableSingleEntryString = [NSMutableString new];
                                 keyFormatString = nil;
                                 break;
                             }
                         }
                     }
-
-                    if (![templateStringsScanner isAtEnd]) // We didn't process the file completely
+                    if (!templateStringsScanner.isAtEnd) // We didn't process the file completely
                         break; // Break out of processing this strings file for all languages
 
-                    if ([mutableLocalizedStringsInTargetLanguageString characterAtIndex:(mutableLocalizedStringsInTargetLanguageString.length - 1)] != '\n')
-                        [mutableLocalizedStringsInTargetLanguageString appendString:@"\n"];
+                    // write translations file (or delete it)
+                    NSString *const localizedStringsPath = [languageProjPath stringByAppendingPathComponent:devStringsComponent];
+                    if (mutableLocalizedStringsInTargetLanguageString.length) {
+                        if ([mutableLocalizedStringsInTargetLanguageString characterAtIndex:(mutableLocalizedStringsInTargetLanguageString.length - 1)] != '\n')
+                            [mutableLocalizedStringsInTargetLanguageString appendString:@"\n"];
 
-                    NSString *localizedStringsPath = [[sourcePath stringByAppendingPathComponent:lproj] stringByAppendingPathComponent:devStringsComponent];
-                    __autoreleasing NSError *writeError = nil;
-                    if (![mutableLocalizedStringsInTargetLanguageString writeToFile:localizedStringsPath atomically:YES encoding:NSUTF8StringEncoding error:&writeError])
-                        fputs([[NSString stringWithFormat:@"          %@: Error writing localized strings file: %@", devStringsComponent, writeError] UTF8String], stderr);
+                        __autoreleasing NSError *writeError = nil;
+                        if (![mutableLocalizedStringsInTargetLanguageString writeToFile:localizedStringsPath atomically:NO encoding:NSUTF8StringEncoding error:&writeError])
+                            fputs([[NSString stringWithFormat:@"          %@: Error writing localized strings file: %@", devStringsComponent, writeError] UTF8String], stderr);
+                    } else
+                        [fileManager removeItemAtPath:localizedStringsPath error:NULL];
+
+                    // write missing translations file (or delete it)
+                    NSString *const unlocalizedStringsPath = [languageProjUnlocalizedStringsFolderPath stringByAppendingPathComponent:devStringsComponent];
+                    if (mutableUnlocalizedStringsInTargetLanguageString.length) {
+                        __autoreleasing NSError *createError = nil;
+                        if (![fileManager fileExistsAtPath:languageProjUnlocalizedStringsFolderPath] && ![fileManager createDirectoryAtPath:languageProjUnlocalizedStringsFolderPath withIntermediateDirectories:NO attributes:nil error:&createError])
+                            fputs([[NSString stringWithFormat:@"          %@: Error creating unlocalized strings folder: %@", DMUnlocalizedStringsFolderName, createError] UTF8String], stderr);
+
+                        __autoreleasing NSError *writeError = nil;
+                        if (![mutableUnlocalizedStringsInTargetLanguageString writeToFile:unlocalizedStringsPath atomically:NO encoding:NSUTF8StringEncoding error:&writeError])
+                            fputs([[NSString stringWithFormat:@"          %@/%@: Error writing unlocalized strings file: %@", DMUnlocalizedStringsFolderName, devStringsComponent, writeError] UTF8String], stderr);
+                    } else
+                        [fileManager removeItemAtPath:unlocalizedStringsPath error:NULL];
+
                 }
-                fputs([[NSString stringWithFormat:@"          Wrote %lu translated strings, guessed on %lu, untranslated ~%ld\n", translatedStringCount, guessingStringCount, ((NSNumber *)unlocalizedStringRoughCountByLanguage[lproj]).unsignedIntegerValue] UTF8String], stdout);
 
                 /*
                  * Remove strings files no longer present in the development language (including orphans file)
                  */
-                for (NSString *languageSubfile in [fileManager contentsOfDirectoryAtPath:langaugeProjPath error:NULL]) {
+                for (NSString *languageSubfile in [fileManager contentsOfDirectoryAtPath:languageProjPath error:NULL]) {
                     if ([languageSubfile.pathExtension isEqual:@"strings"] && ![devLanguageStringsFiles containsObject:languageSubfile]) {
                         if (![languageSubfile isEqual:DMOrphanedStringsFilename])
                             fputs([[NSString stringWithFormat:@"          Removing source directory strings file %@/%@\n", lproj, languageSubfile] UTF8String], stdout);
-                        [fileManager removeItemAtPath:[langaugeProjPath stringByAppendingPathComponent:languageSubfile] error:NULL];
+                        [fileManager removeItemAtPath:[languageProjPath stringByAppendingPathComponent:languageSubfile] error:NULL];
                     }
                 }
+                // Remove unlocalized string subfolder if it's empty
+                if ([fileManager fileExistsAtPath:languageProjUnlocalizedStringsFolderPath] && ![fileManager contentsOfDirectoryAtPath:languageProjUnlocalizedStringsFolderPath error:NULL].count)
+                    [fileManager removeItemAtPath:languageProjUnlocalizedStringsFolderPath error:NULL];
+
+                // Summary
+                fputs([[NSString stringWithFormat:@"          Wrote %lu translated strings, guessed on %lu, untranslated ~%ld\n", translatedStringCount, guessingStringCount, ((NSNumber *)unlocalizedStringRoughCountByLanguage[lproj]).unsignedIntegerValue] UTF8String], stdout);
 
                 /*
                  * Write orphaned translations
@@ -330,8 +359,8 @@ int main(int argc, const char *argv[])
                 }
                 
                 if (orphanedStringCount > 0) { // old orphans file was already blown away above when we deleted all unused strings files
-                    NSString *const orphanedStringsFilePath = [[sourcePath stringByAppendingPathComponent:lproj] stringByAppendingPathComponent:DMOrphanedStringsFilename];
-                    [unusedLocalizedStrings writeToFile:orphanedStringsFilePath atomically:YES encoding:NSUTF8StringEncoding error:NULL];
+                    NSString *const orphanedStringsFilePath = [languageProjPath stringByAppendingPathComponent:DMOrphanedStringsFilename];
+                    [unusedLocalizedStrings writeToFile:orphanedStringsFilePath atomically:NO encoding:NSUTF8StringEncoding error:NULL];
                     fputs([[NSString stringWithFormat:@"          Wrote %lu orphaned strings to %@\n", orphanedStringCount, DMOrphanedStringsFilename] UTF8String], stdout);
                 }
             }
