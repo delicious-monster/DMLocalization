@@ -301,7 +301,7 @@ int main(int argc, const char *argv[])
                     if (![mutableLocalizedStringsInTargetLanguageString writeToFile:localizedStringsPath atomically:YES encoding:NSUTF8StringEncoding error:&writeError])
                         fputs([[NSString stringWithFormat:@"          %@: Error writing localized strings file: %@", devStringsComponent, writeError] UTF8String], stderr);
                 }
-                fputs([[NSString stringWithFormat:@"          Wrote %lu translated strings, guessed on %lu\n", translatedStringCount, guessingStringCount] UTF8String], stdout);
+                fputs([[NSString stringWithFormat:@"          Wrote %lu translated strings, guessed on %lu, untranslated ~%ld\n", translatedStringCount, guessingStringCount, ((NSNumber *)unlocalizedStringRoughCountByLanguage[lproj]).unsignedIntegerValue] UTF8String], stdout);
 
                 /*
                  * Remove strings files no longer present in the development language (including orphans file)
