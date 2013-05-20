@@ -6,7 +6,7 @@
 
 #import <Cocoa/Cocoa.h>
 
-#define LOG_INFO 1
+#define LOG_INFO 0
 
 
 int main(int argc, const char *argv[])
@@ -53,7 +53,7 @@ int main(int argc, const char *argv[])
                                                                                      ];
 
         NSMutableString *const outputStrings = [NSMutableString new];
-        __block NSUInteger lineCount = 0;
+        __block NSUInteger lineCount = 0, translationCount = 0, skippedTranslationCount = 0;
         __block NSString *lastComment = nil;
         [rawXIBStrings enumerateLinesUsingBlock:^(NSString *line, BOOL *stop) {
             lineCount++;
@@ -68,6 +68,7 @@ int main(int argc, const char *argv[])
 
                 // see if this contains our marker ("??") for placeholder strings that shouldn't be localized
                 if ([line rangeOfString:doNotLocalizeMarker].length || [line rangeOfString:doNotLocalizeMarker2].length) {
+                    skippedTranslationCount++;
 #if LOG_INFO
                     printf("%s:%lu info: skipped line, ‘??’ found: “%s”\n", filename.UTF8String, (unsigned long)lineCount, line.UTF8String);
 #endif
@@ -84,12 +85,14 @@ int main(int argc, const char *argv[])
                 /* Class = "NSMenu"; title = "ANYTHING"; ObjectID = "15"; */
                     skipLine = [lastComment hasPrefix:@"/* Class = \"NSMenu\"; title = \""];
                 if (skipLine) {
+                    skippedTranslationCount++;
 #if LOG_INFO
                     printf("%s:%lu info: skipped line, comment matched blacklist: “%s”\n", filename.UTF8String, (unsigned long)lineCount, lastComment.UTF8String);
 #endif
                     return;
                 }
 
+                translationCount++;
                 [outputStrings appendString:@"\n"];
                 if (lastComment) {
                     [outputStrings appendString:lastComment]; [outputStrings appendString:@"\n"];
@@ -101,7 +104,9 @@ int main(int argc, const char *argv[])
         }];
         
         if (outputStrings.length) {
-            if (![outputStrings writeToFile:filePath atomically:YES encoding:NSUTF8StringEncoding error:&error]) {
+            if ([outputStrings writeToFile:filePath atomically:YES encoding:NSUTF8StringEncoding error:&error])
+                printf("%s: %lu key/values written, %lu skipped\n", filename.UTF8String, (unsigned long)translationCount, (unsigned long)skippedTranslationCount);
+            else {
                 fprintf(stderr, "%s: Error writing: %s\n", filePath.UTF8String, error.localizedDescription.UTF8String);
                 return -1;
             }
