@@ -320,6 +320,9 @@ int main(int argc, const char *argv[])
                     // write missing translations file (or delete it)
                     NSString *const unlocalizedStringsPath = [languageProjUnlocalizedStringsFolderPath stringByAppendingPathComponent:devStringsComponent];
                     if (mutableUnlocalizedStringsInTargetLanguageString.length) {
+                        if ([mutableUnlocalizedStringsInTargetLanguageString characterAtIndex:(mutableUnlocalizedStringsInTargetLanguageString.length - 1)] != '\n')
+                            [mutableUnlocalizedStringsInTargetLanguageString appendString:@"\n"];
+
                         __autoreleasing NSError *createError = nil;
                         if (![fileManager fileExistsAtPath:languageProjUnlocalizedStringsFolderPath] && ![fileManager createDirectoryAtPath:languageProjUnlocalizedStringsFolderPath withIntermediateDirectories:NO attributes:nil error:&createError])
                             fputs([[NSString stringWithFormat:@"          %@: Error creating unlocalized strings folder: %@", DMUnlocalizedStringsFolderName, createError] UTF8String], stderr);
