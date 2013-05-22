@@ -8,6 +8,7 @@
 
 #import <Foundation/Foundation.h>
 
+#import "localizationConstants.h"
 #import "DMFormatSpecifier.h"
 #import "DMFormatString.h"
 #import "DMLocalizationMapping.h"
@@ -15,7 +16,6 @@
 
 
 //#define SET_NEEDS_LOCALIZATION_IF_SAME_AS_DEV_STRING
-static NSString *const DMUnlocalizedStringsFolderName = @"_unlocalized strings";
 static NSString *const DMOrphanedStringsFilename = @"_unused do not localize.strings";
 static NSString *const DMNeedsLocalizationMarker = @" /*!!! Needs translation, delete this comment when translated !!!*/";
 static NSString *const DMLocalizationOutOfContextMarker = @" /*!!! Translation found in different context, delete this comment if ok !!!*/";
