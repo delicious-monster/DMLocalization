@@ -75,11 +75,20 @@ int main(int argc, const char *argv[])
                 NSMutableSet *const unusedLocalizationKeys = [NSMutableSet set];
                 NSString *const languageProjPath = [sourcePath stringByAppendingPathComponent:lproj];
                 NSString *const languageProjUnlocalizedStringsFolderPath = [languageProjPath stringByAppendingPathComponent:DMUnlocalizedStringsFolderName];
+                
+                NSMutableArray *const stringFilePaths = [NSMutableArray new];
+                for (NSString *languageSubfile in [fileManager contentsOfDirectoryAtPath:languageProjPath error:NULL])
+                    if ([languageSubfile.pathExtension isEqual:@"strings"])
+                        [stringFilePaths addObject:[languageProjPath stringByAppendingPathComponent:languageSubfile]];
 
-                for (NSString *languageSubfile in [fileManager contentsOfDirectoryAtPath:languageProjPath error:NULL]) {
-                    if (![languageSubfile.pathExtension isEqual:@"strings"])
-                        continue;
-                    NSString *stringsPath = [languageProjPath stringByAppendingPathComponent:languageSubfile];
+                // Add _incoming strings to end, so they'll supercede existing strings
+                NSString *const incomingStringsFilesFolderPath = [languageProjPath stringByAppendingPathComponent:DMIncomingStringsFolderName];
+                if ([fileManager fileExistsAtPath:incomingStringsFilesFolderPath])
+                    for (NSString *languageSubfile in [fileManager contentsOfDirectoryAtPath:incomingStringsFilesFolderPath error:NULL])
+                        if ([languageSubfile.pathExtension isEqual:@"strings"])
+                            [stringFilePaths addObject:[incomingStringsFilesFolderPath stringByAppendingPathComponent:languageSubfile]];
+
+                for (NSString *stringsPath in stringFilePaths) {
                     NSString *stringsContents = [NSString stringWithContentsOfFile:stringsPath usedEncoding:NULL error:NULL];
                     if (!stringsContents) {
                         fputs([[NSString stringWithFormat:@"%@: Error: Unable to read strings file\n", stringsPath] UTF8String], stderr);
@@ -170,7 +179,7 @@ int main(int argc, const char *argv[])
                                     && ![valueFormatString.description rangeOfString:@"??"].length // Old localizations may still have some of these knocking around, clean them out whenever we can. eg: /* Class = "NSTextFieldCell"; title = "???? synopsis body"; ObjectID = "222"; */
                                     && ![valueFormatString.description rangeOfString:@"⌧"].length) { // extra safety in case my new "don't localize" slips through
 
-                                        NSString *const scanContextString = ([scanner scanString:DMLocalizationOutOfContextMarker intoString:NULL] || [languageSubfile isEqual:DMOrphanedStringsFilename]) ? nil : languageSubfile;
+                                        NSString *const scanContextString = ([scanner scanString:DMLocalizationOutOfContextMarker intoString:NULL] || [stringsPath.lastPathComponent isEqual:DMOrphanedStringsFilename]) ? nil : stringsPath.lastPathComponent;
 
                                         [languageCorpus addLocalization:valueFormatString forDevString:keyFormatString context:scanContextString];
                                         if (xibKeyFormatString) {
@@ -332,6 +341,8 @@ int main(int argc, const char *argv[])
                             fputs([[NSString stringWithFormat:@"          %@/%@: Error writing unlocalized strings file: %@", DMUnlocalizedStringsFolderName, devStringsComponent, writeError] UTF8String], stderr);
                     }
                 }
+                
+                [fileManager removeItemAtPath:incomingStringsFilesFolderPath error:NULL];
 
                 /*
                  * Remove strings files no longer present in the development language (including orphans file)

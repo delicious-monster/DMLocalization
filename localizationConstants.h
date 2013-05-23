@@ -10,6 +10,6 @@
 #define Library_localizationConstants_h
 
 static NSString *const DMUnlocalizedStringsFolderName = @"_unlocalized strings";
-
+static NSString *const DMIncomingStringsFolderName = @"_incoming strings";
 
 #endif
