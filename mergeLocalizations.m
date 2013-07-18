@@ -393,10 +393,9 @@ int main(int argc, const char *argv[])
             NSUInteger roughUnlocalizedCount = [unlocalizedStringRoughCountByLanguage[lproj] unsignedIntegerValue];
             float localizedProportion = 1.0f - ((float)roughUnlocalizedCount / (float)templateStringSet.count);
             NSUInteger barCharCount = (NSUInteger)roundf(MAX(MIN(localizedProportion, 1.0f), 0.0f) * barWidth);
-            
-            NSString *paddedLproj = [lproj stringByPaddingToLength:15 withString:@" " startingAtIndex:0];
-            NSString *bar = [[@"" stringByPaddingToLength:barCharCount withString:@"=" startingAtIndex:0] stringByPaddingToLength:barWidth withString:@" " startingAtIndex:0];
-            fputs([[NSString stringWithFormat:@"%@ [%@] %2.f%% localized\n", paddedLproj, bar, localizedProportion * 100.0] UTF8String], stdout);
+
+            NSString *bar = [[@"" stringByPaddingToLength:barCharCount withString:@"●" startingAtIndex:0] stringByPaddingToLength:barWidth withString:@"○" startingAtIndex:0];
+            fputs([[NSString stringWithFormat:@"%@\t[%@] %2.f%% localized\n", lproj, bar, localizedProportion * 100.0] UTF8String], stdout);
         }
     }
     return EXIT_SUCCESS;
