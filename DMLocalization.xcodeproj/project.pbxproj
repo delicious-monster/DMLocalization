@@ -32,6 +32,7 @@
 		28EDD3DF179874CB00DBF343 /* xibLocalizationPostprocessor.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = xibLocalizationPostprocessor.m; sourceTree = "<group>"; };
 		28EDD3E51798757900DBF343 /* xibLocalizationPostprocessor */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = xibLocalizationPostprocessor; sourceTree = BUILT_PRODUCTS_DIR; };
 		28EDD3FA1798771F00DBF343 /* mergeLocalizations */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = mergeLocalizations; sourceTree = BUILT_PRODUCTS_DIR; };
+		28EDD40017987AA200DBF343 /* update-and-merge-localizations.example.zsh */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = "update-and-merge-localizations.example.zsh"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -61,6 +62,7 @@
 				28EDD3DF179874CB00DBF343 /* xibLocalizationPostprocessor.m */,
 				28EDD3DE179874CB00DBF343 /* mergeLocalizations.m */,
 				28EDD3E0179874D200DBF343 /* Strings File Parsing */,
+				28EDD40117987FE600DBF343 /* Sample script for enclosing project */,
 				28EDD3C6179874A700DBF343 /* Frameworks */,
 				28EDD3C5179874A700DBF343 /* Products */,
 			);
@@ -96,6 +98,14 @@
 				28EDD3DC179874CB00DBF343 /* DMStringsFileScanner.m */,
 			);
 			name = "Strings File Parsing";
+			sourceTree = "<group>";
+		};
+		28EDD40117987FE600DBF343 /* Sample script for enclosing project */ = {
+			isa = PBXGroup;
+			children = (
+				28EDD40017987AA200DBF343 /* update-and-merge-localizations.example.zsh */,
+			);
+			name = "Sample script for enclosing project";
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -336,6 +346,7 @@
 				28EDD3F01798757900DBF343 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 		28EDD3F71798771F00DBF343 /* Build configuration list for PBXNativeTarget "mergeLocalizations" */ = {
 			isa = XCConfigurationList;
@@ -344,6 +355,7 @@
 				28EDD3F91798771F00DBF343 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};
