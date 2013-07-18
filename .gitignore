@@ -1,0 +1,13 @@
+.DS_Store
+.*.swp
+.idea
+.svn
+*.pbxuser
+*.mode1
+*.mode1v3
+*.mode2v3
+*.o
+*.d
+build
+xcuserdata
+project.xcworkspace
