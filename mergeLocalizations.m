@@ -389,7 +389,7 @@ int main(int argc, const char *argv[])
          */
         fputs("\n---- Approximate statistics ----\n", stdout);
         const NSUInteger barWidth = 40;
-        for (NSString *lproj in sourceLanguageLprojs) {
+        for (NSString *lproj in [sourceLanguageLprojs sortedArrayUsingDescriptors:@[[NSSortDescriptor sortDescriptorWithKey:@"self" ascending:YES]]]) {
             NSUInteger roughUnlocalizedCount = [unlocalizedStringRoughCountByLanguage[lproj] unsignedIntegerValue];
             float localizedProportion = 1.0f - ((float)roughUnlocalizedCount / (float)templateStringSet.count);
             NSUInteger barCharCount = (NSUInteger)roundf(MAX(MIN(localizedProportion, 1.0f), 0.0f) * barWidth);
