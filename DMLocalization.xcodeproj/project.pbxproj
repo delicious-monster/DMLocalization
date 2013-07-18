@@ -1,0 +1,351 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 46;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		28EDD3E61798757900DBF343 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 28EDD3C7179874A700DBF343 /* Foundation.framework */; };
+		28EDD3F1179875BE00DBF343 /* xibLocalizationPostprocessor.m in Sources */ = {isa = PBXBuildFile; fileRef = 28EDD3DF179874CB00DBF343 /* xibLocalizationPostprocessor.m */; };
+		28EDD3F61798771F00DBF343 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 28EDD3C7179874A700DBF343 /* Foundation.framework */; };
+		28EDD3FB1798772C00DBF343 /* mergeLocalizations.m in Sources */ = {isa = PBXBuildFile; fileRef = 28EDD3DE179874CB00DBF343 /* mergeLocalizations.m */; };
+		28EDD3FC1798772E00DBF343 /* DMFormatSpecifier.m in Sources */ = {isa = PBXBuildFile; fileRef = 28EDD3D6179874CB00DBF343 /* DMFormatSpecifier.m */; };
+		28EDD3FD1798772F00DBF343 /* DMFormatString.m in Sources */ = {isa = PBXBuildFile; fileRef = 28EDD3D8179874CB00DBF343 /* DMFormatString.m */; };
+		28EDD3FE1798773100DBF343 /* DMLocalizationMapping.m in Sources */ = {isa = PBXBuildFile; fileRef = 28EDD3DA179874CB00DBF343 /* DMLocalizationMapping.m */; };
+		28EDD3FF1798773400DBF343 /* DMStringsFileScanner.m in Sources */ = {isa = PBXBuildFile; fileRef = 28EDD3DC179874CB00DBF343 /* DMStringsFileScanner.m */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		28EDD3C7179874A700DBF343 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
+		28EDD3D5179874CB00DBF343 /* DMFormatSpecifier.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DMFormatSpecifier.h; sourceTree = "<group>"; };
+		28EDD3D6179874CB00DBF343 /* DMFormatSpecifier.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = DMFormatSpecifier.m; sourceTree = "<group>"; };
+		28EDD3D7179874CB00DBF343 /* DMFormatString.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DMFormatString.h; sourceTree = "<group>"; };
+		28EDD3D8179874CB00DBF343 /* DMFormatString.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = DMFormatString.m; sourceTree = "<group>"; };
+		28EDD3D9179874CB00DBF343 /* DMLocalizationMapping.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DMLocalizationMapping.h; sourceTree = "<group>"; };
+		28EDD3DA179874CB00DBF343 /* DMLocalizationMapping.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = DMLocalizationMapping.m; sourceTree = "<group>"; };
+		28EDD3DB179874CB00DBF343 /* DMStringsFileScanner.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DMStringsFileScanner.h; sourceTree = "<group>"; };
+		28EDD3DC179874CB00DBF343 /* DMStringsFileScanner.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = DMStringsFileScanner.m; sourceTree = "<group>"; };
+		28EDD3DD179874CB00DBF343 /* localizationConstants.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = localizationConstants.h; sourceTree = "<group>"; };
+		28EDD3DE179874CB00DBF343 /* mergeLocalizations.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = mergeLocalizations.m; sourceTree = "<group>"; };
+		28EDD3DF179874CB00DBF343 /* xibLocalizationPostprocessor.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = xibLocalizationPostprocessor.m; sourceTree = "<group>"; };
+		28EDD3E51798757900DBF343 /* xibLocalizationPostprocessor */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = xibLocalizationPostprocessor; sourceTree = BUILT_PRODUCTS_DIR; };
+		28EDD3FA1798771F00DBF343 /* mergeLocalizations */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = mergeLocalizations; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		28EDD3E21798757900DBF343 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				28EDD3E61798757900DBF343 /* Foundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		28EDD3F51798771F00DBF343 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				28EDD3F61798771F00DBF343 /* Foundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		28EDD3BB179874A700DBF343 = {
+			isa = PBXGroup;
+			children = (
+				28EDD3DD179874CB00DBF343 /* localizationConstants.h */,
+				28EDD3DF179874CB00DBF343 /* xibLocalizationPostprocessor.m */,
+				28EDD3DE179874CB00DBF343 /* mergeLocalizations.m */,
+				28EDD3E0179874D200DBF343 /* Strings File Parsing */,
+				28EDD3C6179874A700DBF343 /* Frameworks */,
+				28EDD3C5179874A700DBF343 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		28EDD3C5179874A700DBF343 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				28EDD3E51798757900DBF343 /* xibLocalizationPostprocessor */,
+				28EDD3FA1798771F00DBF343 /* mergeLocalizations */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		28EDD3C6179874A700DBF343 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				28EDD3C7179874A700DBF343 /* Foundation.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		28EDD3E0179874D200DBF343 /* Strings File Parsing */ = {
+			isa = PBXGroup;
+			children = (
+				28EDD3D5179874CB00DBF343 /* DMFormatSpecifier.h */,
+				28EDD3D6179874CB00DBF343 /* DMFormatSpecifier.m */,
+				28EDD3D7179874CB00DBF343 /* DMFormatString.h */,
+				28EDD3D8179874CB00DBF343 /* DMFormatString.m */,
+				28EDD3D9179874CB00DBF343 /* DMLocalizationMapping.h */,
+				28EDD3DA179874CB00DBF343 /* DMLocalizationMapping.m */,
+				28EDD3DB179874CB00DBF343 /* DMStringsFileScanner.h */,
+				28EDD3DC179874CB00DBF343 /* DMStringsFileScanner.m */,
+			);
+			name = "Strings File Parsing";
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		28EDD3E41798757900DBF343 /* xibLocalizationPostprocessor */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 28EDD3EE1798757900DBF343 /* Build configuration list for PBXNativeTarget "xibLocalizationPostprocessor" */;
+			buildPhases = (
+				28EDD3E11798757900DBF343 /* Sources */,
+				28EDD3E21798757900DBF343 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = xibLocalizationPostprocessor;
+			productName = xibLocalizationPostprocessor;
+			productReference = 28EDD3E51798757900DBF343 /* xibLocalizationPostprocessor */;
+			productType = "com.apple.product-type.tool";
+		};
+		28EDD3F21798771F00DBF343 /* mergeLocalizations */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 28EDD3F71798771F00DBF343 /* Build configuration list for PBXNativeTarget "mergeLocalizations" */;
+			buildPhases = (
+				28EDD3F31798771F00DBF343 /* Sources */,
+				28EDD3F51798771F00DBF343 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = mergeLocalizations;
+			productName = xibLocalizationPostprocessor;
+			productReference = 28EDD3FA1798771F00DBF343 /* mergeLocalizations */;
+			productType = "com.apple.product-type.tool";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		28EDD3BC179874A700DBF343 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				CLASSPREFIX = DM;
+				LastUpgradeCheck = 0460;
+				ORGANIZATIONNAME = "Delicious Monster Software";
+			};
+			buildConfigurationList = 28EDD3BF179874A700DBF343 /* Build configuration list for PBXProject "DMLocalization" */;
+			compatibilityVersion = "Xcode 3.2";
+			developmentRegion = English;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+			);
+			mainGroup = 28EDD3BB179874A700DBF343;
+			productRefGroup = 28EDD3C5179874A700DBF343 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				28EDD3E41798757900DBF343 /* xibLocalizationPostprocessor */,
+				28EDD3F21798771F00DBF343 /* mergeLocalizations */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		28EDD3E11798757900DBF343 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				28EDD3F1179875BE00DBF343 /* xibLocalizationPostprocessor.m in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		28EDD3F31798771F00DBF343 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				28EDD3FB1798772C00DBF343 /* mergeLocalizations.m in Sources */,
+				28EDD3FC1798772E00DBF343 /* DMFormatSpecifier.m in Sources */,
+				28EDD3FD1798772F00DBF343 /* DMFormatString.m in Sources */,
+				28EDD3FE1798773100DBF343 /* DMLocalizationMapping.m in Sources */,
+				28EDD3FF1798773400DBF343 /* DMStringsFileScanner.m in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		28EDD3D0179874A700DBF343 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = "$(ARCHS_STANDARD_64_BIT)";
+				CLANG_ANALYZER_SECURITY_INSECUREAPI_RAND = YES;
+				CLANG_ANALYZER_SECURITY_INSECUREAPI_STRCPY = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_ENABLE_OBJC_EXCEPTIONS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				GCC_TREAT_WARNINGS_AS_ERRORS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_MISSING_NEWLINE = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_INITIALIZER_NOT_FULLY_BRACKETED = YES;
+				GCC_WARN_SIGN_COMPARE = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES;
+				GCC_WARN_UNKNOWN_PRAGMAS = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 10.8;
+				ONLY_ACTIVE_ARCH = YES;
+				OTHER_CFLAGS = (
+					"-fcatch-undefined-behavior",
+					"-ftrapv",
+				);
+				SDKROOT = macosx;
+				WARNING_CFLAGS = (
+					"-Wmost",
+					"-Wcast-align",
+					"-Wcustom-atomic-properties",
+					"-Woverriding-method-mismatch",
+					"-Wpointer-arith",
+					"-Wsuper-class-method-mismatch",
+					"-Wno-semicolon-before-method-body",
+					"-Wno-error=deprecated-implementations",
+					"-Wno-error=deprecated-declarations",
+					"-Wno-error=overriding-method-mismatch",
+					"-Wno-error=super-class-method-mismatch",
+					"-Wno-error=unused-variable",
+					"-Wno-error=#warnings",
+				);
+			};
+			name = Debug;
+		};
+		28EDD3D1179874A700DBF343 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = "$(ARCHS_STANDARD_64_BIT)";
+				CLANG_ANALYZER_SECURITY_INSECUREAPI_RAND = YES;
+				CLANG_ANALYZER_SECURITY_INSECUREAPI_STRCPY = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_ENABLE_OBJC_EXCEPTIONS = YES;
+				GCC_TREAT_WARNINGS_AS_ERRORS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_MISSING_NEWLINE = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_INITIALIZER_NOT_FULLY_BRACKETED = YES;
+				GCC_WARN_SIGN_COMPARE = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES;
+				GCC_WARN_UNKNOWN_PRAGMAS = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 10.8;
+				SDKROOT = macosx;
+				WARNING_CFLAGS = (
+					"-Wmost",
+					"-Wcast-align",
+					"-Wcustom-atomic-properties",
+					"-Woverriding-method-mismatch",
+					"-Wpointer-arith",
+					"-Wsuper-class-method-mismatch",
+					"-Wno-semicolon-before-method-body",
+					"-Wno-error=deprecated-implementations",
+					"-Wno-error=deprecated-declarations",
+					"-Wno-error=overriding-method-mismatch",
+					"-Wno-error=super-class-method-mismatch",
+					"-Wno-error=unused-variable",
+					"-Wno-error=#warnings",
+				);
+			};
+			name = Release;
+		};
+		28EDD3EF1798757900DBF343 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+			};
+			name = Debug;
+		};
+		28EDD3F01798757900DBF343 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+			};
+			name = Release;
+		};
+		28EDD3F81798771F00DBF343 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				PRODUCT_NAME = mergeLocalizations;
+				SKIP_INSTALL = YES;
+			};
+			name = Debug;
+		};
+		28EDD3F91798771F00DBF343 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				PRODUCT_NAME = mergeLocalizations;
+				SKIP_INSTALL = YES;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		28EDD3BF179874A700DBF343 /* Build configuration list for PBXProject "DMLocalization" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				28EDD3D0179874A700DBF343 /* Debug */,
+				28EDD3D1179874A700DBF343 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		28EDD3EE1798757900DBF343 /* Build configuration list for PBXNativeTarget "xibLocalizationPostprocessor" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				28EDD3EF1798757900DBF343 /* Debug */,
+				28EDD3F01798757900DBF343 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+		};
+		28EDD3F71798771F00DBF343 /* Build configuration list for PBXNativeTarget "mergeLocalizations" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				28EDD3F81798771F00DBF343 /* Debug */,
+				28EDD3F91798771F00DBF343 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 28EDD3BC179874A700DBF343 /* Project object */;
+}
