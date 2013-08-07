@@ -84,9 +84,30 @@ int main(int argc, const char *argv[])
                 // Add _incoming strings to end, so they'll supercede existing strings
                 NSString *const incomingStringsFilesFolderPath = [languageProjPath stringByAppendingPathComponent:DMIncomingStringsFolderName];
                 if ([fileManager fileExistsAtPath:incomingStringsFilesFolderPath])
-                    for (NSString *languageSubfile in [fileManager contentsOfDirectoryAtPath:incomingStringsFilesFolderPath error:NULL])
+                    for (NSString *languageSubfile in [fileManager contentsOfDirectoryAtPath:incomingStringsFilesFolderPath error:NULL]) {
+                        NSString *const path = [incomingStringsFilesFolderPath stringByAppendingPathComponent:languageSubfile];
                         if ([languageSubfile.pathExtension isEqual:@"strings"])
-                            [stringFilePaths addObject:[incomingStringsFilesFolderPath stringByAppendingPathComponent:languageSubfile]];
+                            [stringFilePaths addObject:path];
+                        else if ([languageSubfile.pathExtension isEqual:@"plist"]) {
+                            __autoreleasing NSError *plistError;
+                            BOOL valid = NO;
+                            NSData *const plistData = [NSData dataWithContentsOfFile:path options:0 error:&plistError];
+                            if (plistData)
+                                valid = ([NSPropertyListSerialization propertyListWithData:plistData options:0 format:NULL error:&plistError] != nil);
+
+                            if (!valid) {
+                                fputs([[NSString stringWithFormat:@"%@: Error: Invalid property list file: %@\n", path, plistError] UTF8String], stderr);
+                                exit(EXIT_FAILURE);
+                            } else {
+                                NSString *const destPath = [languageProjPath stringByAppendingPathComponent:languageSubfile];
+                                [[NSFileManager defaultManager] removeItemAtPath:destPath error:NULL];
+                                if (![[NSFileManager defaultManager] copyItemAtPath:path toPath:destPath error:&plistError]) {
+                                    fputs([[NSString stringWithFormat:@"%@: Error copying property list file: %@\n", path, plistError] UTF8String], stderr);
+                                    exit(EXIT_FAILURE);
+                                }
+                            }
+                        }
+                    }
 
                 for (NSString *stringsPath in stringFilePaths) {
                     NSString *stringsContents = [NSString stringWithContentsOfFile:stringsPath usedEncoding:NULL error:NULL];
