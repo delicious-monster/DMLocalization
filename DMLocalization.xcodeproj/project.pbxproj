@@ -228,7 +228,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 10.8;
 				ONLY_ACTIVE_ARCH = YES;
 				OTHER_CFLAGS = (
-					"-fcatch-undefined-behavior",
+					"-fsanitize-undefined-trap-on-error",
 					"-ftrapv",
 				);
 				SDKROOT = macosx;
