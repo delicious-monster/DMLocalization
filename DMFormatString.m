@@ -129,7 +129,7 @@
     BOOL hasBitsNeedingLocalization = NO;
     for (id component in _components)
         if ([component isKindOfClass:[NSString class]])
-            if ([component stringByTrimmingCharactersInSet:[[NSCharacterSet letterCharacterSet] invertedSet]].length > 0) {
+            if ([component rangeOfCharacterFromSet:[NSCharacterSet letterCharacterSet]].length > 0) {
                 hasBitsNeedingLocalization = YES;
                 break;
             }
