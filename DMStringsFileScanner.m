@@ -124,10 +124,10 @@ typedef enum {
 - (BOOL)scanCommentIntoString:(out NSString **)outString;
 {
     static NSString *startComment = @"/*", *endComment = @"*/";
-    NSMutableString *accumulator = [NSMutableString string];
     __autoreleasing NSString *matchString;
 
     if ([_scanner scanString:startComment intoString:&matchString]) {
+        NSMutableString *accumulator = [NSMutableString string];
         [accumulator appendString:matchString];
         if ([_scanner scanUpToString:endComment intoString:&matchString])
             [accumulator appendString:matchString];
